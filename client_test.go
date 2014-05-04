@@ -1,4 +1,4 @@
-package ionos
+package gomes
 
 import (
 	"log"
@@ -8,7 +8,7 @@ import (
 	"io/ioutil"
 	"testing"
 	"code.google.com/p/goprotobuf/proto"
-	mesos "github.com/vladimirvivien/ionos/mesosproto"
+	mesos "github.com/vladimirvivien/gomes/mesosproto"
 )
 
 func TestPIDType(t *testing.T) {

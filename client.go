@@ -1,10 +1,14 @@
-package ionos
+package gomes
 
 import (
+	"net"
     "net/http"
+    "net/http/httputil"
     "net/url"
     "bytes"
-    mesos "github.com/vladimirvivien/ionos/mesosproto"
+    "time"
+    "log"
+    mesos "github.com/vladimirvivien/gomes/mesosproto"
     "code.google.com/p/goprotobuf/proto"
 )
 
@@ -29,7 +33,21 @@ type masterClientStruct struct {
 }
 
 func NewMasterClient(pid PID) *masterClientStruct {
-	return &masterClientStruct{Pid:pid, httpClient:http.Client{}}
+	return &masterClientStruct{
+		Pid:pid, 
+		httpClient:http.Client{
+			Transport : &http.Transport {
+				Dial: func(netw, addr string) (net.Conn, error) {
+					c, err := net.DialTimeout(netw, addr, time.Second * 17)
+					if err != nil {
+						return nil, err
+					}
+					return c, nil
+				},
+				DisableCompression : true,
+			},
+		},
+	}
 }
 
 func (client *masterClientStruct) RegisterFramework(frameWorkPid PID, info mesos.FrameworkInfo) (error){
@@ -38,15 +56,28 @@ func (client *masterClientStruct) RegisterFramework(frameWorkPid PID, info mesos
 		return err
 	}
 	// build Master path
-	u.Path = REG_FRAMEWORK_CMD
+	u.Path = u.User.Username() + REG_FRAMEWORK_CMD
 
 	// prepare request
+	log.Println (info.String())
 	data, err := proto.Marshal(&info)
-	req, err := http.NewRequest("GET", u.String(), bytes.NewReader(data))
+	req, err := http.NewRequest("POST", u.String(), bytes.NewReader(data))
+	req.Header.Add("Content-Type", "application/x-protobuf")
 	req.Header.Add("Connection", "Keep-Alive")
 	req.Header.Add("User-Agent", USER_AGENT_PREFIX + string(frameWorkPid))
+	log.Println ("Sending RegisterFramework request to ", u.String())
+	dumpReq(req)
 
-	client.httpClient.Do(req)
+	_, err = client.httpClient.Do(req)
+
+	if err != nil {
+		return err
+	}
 
 	return nil
+}
+
+func dumpReq (req *http.Request) {
+	out, _ := httputil.DumpRequestOut(req, false)
+	log.Println ("Request Body\n", string(out))
 }
