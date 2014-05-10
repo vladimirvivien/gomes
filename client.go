@@ -15,7 +15,7 @@ import (
 const (
 	HTTP_SCHEME 		= "http"
 	REG_FRAMEWORK_CMD 	= "/mesos.internal.RegisterFrameworkMessage"
-	USER_AGENT_PREFIX   = "libprocess/"
+	LIBPROC_PREFIX   = "libprocess/"
 )
 
 type PID string
@@ -50,7 +50,7 @@ func NewMasterClient(pid PID) *masterClientStruct {
 	}
 }
 
-func (client *masterClientStruct) RegisterFramework(frameWorkPid PID, info mesos.FrameworkInfo) (error){
+func (client *masterClientStruct) RegisterFramework(frameWorkPid PID, regMsg mesos.RegisterFrameworkMessage) (error){
 	u, err := client.Pid.AsURL()
 	if(err != nil){
 		return err
@@ -59,17 +59,18 @@ func (client *masterClientStruct) RegisterFramework(frameWorkPid PID, info mesos
 	u.Path = u.User.Username() + REG_FRAMEWORK_CMD
 
 	// prepare request
-	log.Println (info.String())
-	data, err := proto.Marshal(&info)
+	log.Println (regMsg.String())
+	data, err := proto.Marshal(&regMsg)
 	req, err := http.NewRequest("POST", u.String(), bytes.NewReader(data))
 	req.Header.Add("Content-Type", "application/x-protobuf")
 	req.Header.Add("Connection", "Keep-Alive")
-	req.Header.Add("User-Agent", USER_AGENT_PREFIX + string(frameWorkPid))
+	req.Header.Add("Libprocess-From", string(frameWorkPid))
 	log.Println ("Sending RegisterFramework request to ", u.String())
 	dumpReq(req)
 
-	_, err = client.httpClient.Do(req)
-
+	rsp, err := client.httpClient.Do(req)
+	dumpRsp(rsp)
+	
 	if err != nil {
 		return err
 	}
@@ -79,5 +80,10 @@ func (client *masterClientStruct) RegisterFramework(frameWorkPid PID, info mesos
 
 func dumpReq (req *http.Request) {
 	out, _ := httputil.DumpRequestOut(req, false)
-	log.Println ("Request Body\n", string(out))
+	log.Println ("Request Body:\n", string(out))
+}
+
+func dumpRsp (rsp *http.Response) {
+	out, _ := httputil.DumpResponse(rsp, false)
+	log.Println ("Response Body:\n", string(out))	
 }

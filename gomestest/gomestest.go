@@ -11,17 +11,19 @@ func main() {
 	master := gomes.NewMasterClient(gomes.PID("master@127.0.0.1:5050"))
 	schedulerId := gomes.PID("scheduler(1)@127.0.0.1:8080")
 
-	info := &mesos.FrameworkInfo {
-		User: proto.String("test"),
-		Name: proto.String("gomes"),
-		Id:&mesos.FrameworkID{Value: proto.String("gomes-framework-1")},
+	regInfo := &mesos.RegisterFrameworkMessage{
+			Framework: &mesos.FrameworkInfo {
+			User: proto.String("test"),
+			Name: proto.String("gomes"),
+			Id:&mesos.FrameworkID{Value: proto.String("gomes-framework-1")},
+		},
 	}
 
-	err := master.RegisterFramework(schedulerId,*info)
+	err := master.RegisterFramework(schedulerId,*regInfo)
 
 	if err != nil {
 		fmt.Println ("Encountered error ", err)
 	}
 
-	fmt.Println ("Hello.")
+	fmt.Println ("Framework Registered!")
 }
