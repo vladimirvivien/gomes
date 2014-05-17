@@ -5,36 +5,42 @@ import (
     "net/http"
     "net/http/httputil"
     "net/url"
+    "math/rand"
     "bytes"
     "time"
     "log"
+    "os"
+    "strconv"
     mesos "github.com/vladimirvivien/gomes/mesosproto"
     "code.google.com/p/goprotobuf/proto"
 )
 
 const (
 	HTTP_SCHEME 		= "http"
-	REG_FRAMEWORK_CMD 	= "/mesos.internal.RegisterFrameworkMessage"
-	LIBPROC_PREFIX   = "libprocess/"
+	HTTP_POST_METHOD	= "POST"
+	HTTP_MASTER_PREFIX	= "master"
+	HTTP_REG_PATH 		= "/mesos.internal.RegisterFrameworkMessage"
+	HTTP_LIBPROC_PREFIX = "libprocess/"
 )
 
-type PID string
-func (pid PID) AsURL()(*url.URL, error){
-	return url.Parse(HTTP_SCHEME + "://" + string(pid))
+type ID string
+func newID(prefix string) ID {
+	return ID(prefix + "(" + strconv.Itoa(rand.Intn(5)) + ")")
 }
 
-type MesosMasterClient interface {
-	RegisterFramework(PID,mesos.FrameworkInfo)
+type address string
+func (addr address) AsURL()(*url.URL, error){
+	return url.Parse(HTTP_SCHEME + "://" + string(addr))
 }
 
-type masterClientStruct struct {
-	Pid PID
+type masterClient struct {
+	address address
 	httpClient http.Client
 }
 
-func NewMasterClient(pid PID) *masterClientStruct {
-	return &masterClientStruct{
-		Pid:pid, 
+func newMasterClient(master string) *masterClient {
+	return &masterClient{
+		address:address(master), 
 		httpClient:http.Client{
 			Transport : &http.Transport {
 				Dial: func(netw, addr string) (net.Conn, error) {
@@ -50,21 +56,31 @@ func NewMasterClient(pid PID) *masterClientStruct {
 	}
 }
 
-func (client *masterClientStruct) RegisterFramework(frameWorkPid PID, regMsg mesos.RegisterFrameworkMessage) (error){
-	u, err := client.Pid.AsURL()
+func (client *masterClient) registerFramework(schedId ID, framework *mesos.FrameworkInfo) (error){
+	u, err := client.address.AsURL()
 	if(err != nil){
 		return err
 	}
 	// build Master path
-	u.Path = u.User.Username() + REG_FRAMEWORK_CMD
+	u.Path = HTTP_MASTER_PREFIX + HTTP_REG_PATH
 
-	// prepare request
-	log.Println (regMsg.String())
-	data, err := proto.Marshal(&regMsg)
-	req, err := http.NewRequest("POST", u.String(), bytes.NewReader(data))
+	// prepare registration data
+	data, err := proto.Marshal(framework)
+	if (err != nil){
+		return err
+	}
+
+	// prepare HTTP requrest
+	localHost,err := os.Hostname()
+	if (err != nil){
+		return nil
+	}
+	localHost = string(schedId) + localHost + ":" + "5050"
+
+	req, err := http.NewRequest(HTTP_POST_METHOD, u.String(), bytes.NewReader(data))
 	req.Header.Add("Content-Type", "application/x-protobuf")
 	req.Header.Add("Connection", "Keep-Alive")
-	req.Header.Add("Libprocess-From", string(frameWorkPid))
+	req.Header.Add("Libprocess-From", localHost)
 	log.Println ("Sending RegisterFramework request to ", u.String())
 	dumpReq(req)
 
