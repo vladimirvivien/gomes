@@ -48,7 +48,7 @@ func TestMasterClient_RegisterFramework(t *testing.T) {
 			t.Fatalf("Expected Connection Header not found")
 		}
 		
-		cmdPath := "/" + HTTP_MASTER_PREFIX + HTTP_REG_PATH
+		cmdPath := buildReqPath(MESSAGE_REG_FRAMEWORK)
 		if req.URL.Path != cmdPath {
 			t.Fatalf("Expected URL path not found.")
 		}
@@ -70,9 +70,9 @@ func TestMasterClient_RegisterFramework(t *testing.T) {
 			t.Fatal("Problem unmarshaling expected RegisterFrameworkMessage")
 		}
 		info := regMsg.Framework
-		if *info.User != "test-user" ||
-		   *info.Name != "test-name" ||
-		   *info.Id.Value != "test-framework-1" {
+		if info.GetUser() != "test-user" ||
+		   info.GetName() != "test-name" ||
+		   info.Id.GetValue() != "test-framework-1" {
 		   t.Fatalf("Got bad FrameworkInfo values %s, %s, %s", info.User, info.Name, info.Id.Value )
 		}
 

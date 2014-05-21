@@ -16,12 +16,14 @@ import (
 )
 
 const (
-	HTTP_SCHEME 		= "http"
-	HTTP_POST_METHOD	= "POST"
-	HTTP_MASTER_PREFIX	= "master"
-	HTTP_REG_PATH 		= "/mesos.internal.RegisterFrameworkMessage"
-	HTTP_LIBPROC_PREFIX = "libprocess/"
-	HTTP_CONTENT_TYPE	= "application/x-protobuf"
+	MESOS_INTERNAL_PREFIX	= "mesos.internal."
+	HTTP_SCHEME 			= "http"
+	HTTP_POST_METHOD		= "POST"
+	HTTP_MASTER_PREFIX		= "master"
+	HTTP_LIBPROC_PREFIX 	= "libprocess/"
+	HTTP_CONTENT_TYPE		= "application/x-protobuf"
+
+	MESSAGE_REG_FRAMEWORK 	= "RegisterFrameworkMessage"
 
 )
 
@@ -58,13 +60,13 @@ func newMasterClient(master string) *masterClient {
 	}
 }
 
-func (client *masterClient) RegisterFramework(schedId ID, framework *mesos.FrameworkInfo) (error){
+func (client *masterClient) RegisterFramework(schedulerId ID, framework *mesos.FrameworkInfo) (error){
 	u, err := client.address.AsURL()
 	if(err != nil){
 		return err
 	}
 	// build Master path
-	u.Path = HTTP_MASTER_PREFIX + HTTP_REG_PATH
+	u.Path = buildReqPath(MESSAGE_REG_FRAMEWORK)
 
 	// prepare registration data
 	regMsg := &mesos.RegisterFrameworkMessage{Framework:framework}
@@ -78,7 +80,7 @@ func (client *masterClient) RegisterFramework(schedId ID, framework *mesos.Frame
 	if (err != nil){
 		return nil
 	}
-	localHost = string(schedId) + localHost + ":" + "5050"
+	localHost = string(schedulerId) + localHost + ":" + "5050"
 
 	req, err := http.NewRequest(HTTP_POST_METHOD, u.String(), bytes.NewReader(data))
 	req.Header.Add("Content-Type", HTTP_CONTENT_TYPE)
@@ -96,6 +98,14 @@ func (client *masterClient) RegisterFramework(schedId ID, framework *mesos.Frame
 
 	return nil
 }
+
+func buildReqPath(message string) string {
+	return "/"+ HTTP_MASTER_PREFIX + "/" + MESOS_INTERNAL_PREFIX + message
+}
+
+// a generic send function. Will build message path based on msg type.
+// func (client *masterClient) send(msg proto.ProtoMessage) (error) {
+// }
 
 func dumpReq (req *http.Request) {
 	out, _ := httputil.DumpRequestOut(req, false)
