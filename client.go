@@ -21,6 +21,8 @@ const (
 	HTTP_MASTER_PREFIX	= "master"
 	HTTP_REG_PATH 		= "/mesos.internal.RegisterFrameworkMessage"
 	HTTP_LIBPROC_PREFIX = "libprocess/"
+	HTTP_CONTENT_TYPE	= "application/x-protobuf"
+
 )
 
 type ID string
@@ -56,7 +58,7 @@ func newMasterClient(master string) *masterClient {
 	}
 }
 
-func (client *masterClient) registerFramework(schedId ID, framework *mesos.FrameworkInfo) (error){
+func (client *masterClient) RegisterFramework(schedId ID, framework *mesos.FrameworkInfo) (error){
 	u, err := client.address.AsURL()
 	if(err != nil){
 		return err
@@ -65,7 +67,8 @@ func (client *masterClient) registerFramework(schedId ID, framework *mesos.Frame
 	u.Path = HTTP_MASTER_PREFIX + HTTP_REG_PATH
 
 	// prepare registration data
-	data, err := proto.Marshal(framework)
+	regMsg := &mesos.RegisterFrameworkMessage{Framework:framework}
+	data, err := proto.Marshal(regMsg)
 	if (err != nil){
 		return err
 	}
@@ -78,7 +81,7 @@ func (client *masterClient) registerFramework(schedId ID, framework *mesos.Frame
 	localHost = string(schedId) + localHost + ":" + "5050"
 
 	req, err := http.NewRequest(HTTP_POST_METHOD, u.String(), bytes.NewReader(data))
-	req.Header.Add("Content-Type", "application/x-protobuf")
+	req.Header.Add("Content-Type", HTTP_CONTENT_TYPE)
 	req.Header.Add("Connection", "Keep-Alive")
 	req.Header.Add("Libprocess-From", localHost)
 	log.Println ("Sending RegisterFramework request to ", u.String())

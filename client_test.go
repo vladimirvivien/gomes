@@ -1,16 +1,16 @@
 package gomes
 
 import (
-	_"log"
-	_"fmt"
-	_"net/url"
-	_"net/http"
-	_"net/http/httptest"
-	_"io/ioutil"
+	"log"
+	"fmt"
+	"net/url"
+	"net/http"
+	"net/http/httptest"
+	"io/ioutil"
 	"regexp"
 	"testing"
-	_"code.google.com/p/goprotobuf/proto"
-	//mesos "github.com/vladimirvivien/gomes/mesosproto"
+	"code.google.com/p/goprotobuf/proto"
+	mesos "github.com/vladimirvivien/gomes/mesosproto"
 )
 
 func TestAddressType(t *testing.T) {
@@ -39,65 +39,64 @@ func TestIdType(t *testing.T) {
 	}
 }
 
-// func TestMasterClient_RegisterFramework(t *testing.T) {
-// 	schedulerId := PID("scheduler(1)@127.0.0.1:8080")
-// 	// Server-side Validation
-// 	server := makeMockServer(func (rsp http.ResponseWriter, req *http.Request){
-// 		if req.Header.Get("Connection") != "Keep-Alive" {
-// 			t.Fatalf("Expected Connection Header not found")
-// 		}
+func TestMasterClient_RegisterFramework(t *testing.T) {
+	idreg := regexp.MustCompile(`^[a-z]+\(\d+\).*$`)
+
+	// Server-side Validation
+	server := makeMockServer(func (rsp http.ResponseWriter, req *http.Request){
+		if req.Header.Get("Connection") != "Keep-Alive" {
+			t.Fatalf("Expected Connection Header not found")
+		}
 		
-// 		if req.URL.Path != "/master" + REG_FRAMEWORK_CMD {
-// 			t.Fatalf("Expected URL path not found.")
-// 		}
+		cmdPath := "/" + HTTP_MASTER_PREFIX + HTTP_REG_PATH
+		if req.URL.Path != cmdPath {
+			t.Fatalf("Expected URL path not found.")
+		}
 
-// 		expectedUa := string(schedulerId)
-// 		ua := req.Header.Get("Libprocess-From")
-// 		if ua != expectedUa {
-// 			t.Fatalf("User-Agent value malformed expecting %s but got %s", expectedUa, ua)
-// 		}
+		proc := req.Header.Get("Libprocess-From")
+		if  !idreg.MatchString(proc) {
+			t.Fatalf("Libprocess-From value malformed. Got [%s]", proc)
+		}
 
-// 		data, err := ioutil.ReadAll(req.Body)
-// 		if err != nil{
-// 			t.Fatalf("Unable to get FrameworkInfo data")
-// 		}
-// 		defer req.Body.Close()
+		data, err := ioutil.ReadAll(req.Body)
+		if err != nil{
+			t.Fatalf("Unable to get FrameworkInfo data")
+		}
+		defer req.Body.Close()
 
-// 		regMsg := new (mesos.RegisterFrameworkMessage)
-// 		err = proto.Unmarshal(data, regMsg)
-// 		if err != nil {
-// 			t.Fatal("Problem unmarshaling expected RegisterFrameworkMessage")
-// 		}
-// 		info := regMsg.Framework
-// 		if *info.User != "test-user" ||
-// 		   *info.Name != "test-name" ||
-// 		   *info.Id.Value != "test-framework-1" {
-// 		   t.Fatalf("Got bad FrameworkInfo values %s, %s, %s", info.User, info.Name, info.Id.Value )
-// 		}
+		regMsg := new (mesos.RegisterFrameworkMessage)
+		err = proto.Unmarshal(data, regMsg)
+		if err != nil {
+			t.Fatal("Problem unmarshaling expected RegisterFrameworkMessage")
+		}
+		info := regMsg.Framework
+		if *info.User != "test-user" ||
+		   *info.Name != "test-name" ||
+		   *info.Id.Value != "test-framework-1" {
+		   t.Fatalf("Got bad FrameworkInfo values %s, %s, %s", info.User, info.Name, info.Id.Value )
+		}
 
-// 		rsp.WriteHeader(http.StatusAccepted)
-// 		fmt.Print (rsp)
+		rsp.WriteHeader(http.StatusAccepted)
+		fmt.Print (rsp)
 
-// 	})
-// 	defer server.Close()
+	})
+	defer server.Close()
 
-// 	url, _ := url.Parse(server.URL)
-// 	// Test Data
-// 	master := NewMasterClient(PID("master@"+url.Host))
+	url, _ := url.Parse(server.URL)
+	// Test Data
+	master := newMasterClient(url.Host)
 
-// 	regMsg := &mesos.RegisterFrameworkMessage{
-// 	    Framework: &mesos.FrameworkInfo {
-// 			User:proto.String("test-user"),
-// 			Name:proto.String("test-name"),
-// 			Id:&mesos.FrameworkID{Value: proto.String("test-framework-1")},
-// 		},
-// 	}
+	framework := &mesos.FrameworkInfo {
+		User:proto.String("test-user"),
+		Name:proto.String("test-name"),
+		Id:&mesos.FrameworkID{Value: proto.String("test-framework-1")},
+	}
 
-// 	master.RegisterFramework(schedulerId,*regMsg)
-// }
+	master.RegisterFramework(newID("scheduler"),framework)
+}
 
-// func makeMockServer(handler func (rsp http.ResponseWriter, req *http.Request)) *httptest.Server{
-// 	server := httptest.NewServer(http.HandlerFunc(handler))
-// 	log.Println("Created server  " + server.URL)
-// 	return server
-// }
+func makeMockServer(handler func (rsp http.ResponseWriter, req *http.Request)) *httptest.Server{
+	server := httptest.NewServer(http.HandlerFunc(handler))
+	log.Println("Created server  " + server.URL)
+	return server
+}
