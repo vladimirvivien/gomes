@@ -31,14 +31,6 @@ func TestAddressType(t *testing.T) {
 	}
 }
 
-func TestIdType(t *testing.T) {
-	re := regexp.MustCompile(`^[a-z]+\(\d+\)$`)
-	id := newID("scheduler")
-	if !re.MatchString(string(id)) {
-		t.Error("Type ID not generating proper ID value")
-	}
-}
-
 func TestMasterClient_RegisterFramework(t *testing.T) {
 	idreg := regexp.MustCompile(`^[a-z]+\(\d+\).*$`)
 

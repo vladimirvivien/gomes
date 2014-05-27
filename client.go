@@ -5,12 +5,10 @@ import (
     "net/http"
     "net/http/httputil"
     "net/url"
-    "math/rand"
     "bytes"
     "time"
     "log"
     "os"
-    "strconv"
     mesos "github.com/vladimirvivien/gomes/mesosproto"
     "code.google.com/p/goprotobuf/proto"
 )
@@ -27,10 +25,6 @@ const (
 
 )
 
-type ID string
-func newID(prefix string) ID {
-	return ID(prefix + "(" + strconv.Itoa(rand.Intn(5)) + ")")
-}
 
 type address string
 func (addr address) AsURL()(*url.URL, error){
@@ -86,11 +80,8 @@ func (client *masterClient) RegisterFramework(schedulerId ID, framework *mesos.F
 	req.Header.Add("Content-Type", HTTP_CONTENT_TYPE)
 	req.Header.Add("Connection", "Keep-Alive")
 	req.Header.Add("Libprocess-From", localHost)
-	log.Println ("Sending RegisterFramework request to ", u.String())
-	dumpReq(req)
 
-	rsp, err := client.httpClient.Do(req)
-	dumpRsp(rsp)
+	_, err = client.httpClient.Do(req)
 	
 	if err != nil {
 		return err
