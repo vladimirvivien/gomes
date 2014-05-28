@@ -37,8 +37,15 @@ func TestFrameworkRegisteredMessage(t *testing.T) {
 	eventQ := make(chan interface{})
 	go func() {
 		for msg := range eventQ{
-			if _, ok := msg.(mesos.FrameworkRegisteredMessage); !ok {
+			val, ok := msg.(*mesos.FrameworkRegisteredMessage)
+			if !ok {
 				t.Fatal("Failed to receive msg of type FrameworkRegisteredMessage")
+			}
+			if val.FrameworkId.GetValue() != "test-framework-1" {
+				t.Fatal("Expected FrameworkRegisteredMessage.Framework.Id.Value not found.")
+			}
+			if val.MasterInfo.GetId() != "master-1" {
+				t.Fatal("Expected FrameworkRegisteredMessage.Master.Id not found.")
 			}
 		}
 	}()

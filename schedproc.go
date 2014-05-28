@@ -33,11 +33,6 @@ func newSchedulerProcess (addr string, eventQ chan interface{}) *schedulerProces
 		Addr: addr,
 	}
 
-	// localHost,err := os.Hostname()
-	// if (err != nil){
-	// 	localHost = "localhost"
-	// }
-
 	pid := string(newID("scheduler")) + addr
 
 	proc := &schedulerProcess{
@@ -63,22 +58,24 @@ func (proc *schedulerProcess) ServeHTTP (rsp http.ResponseWriter, req *http.Requ
 	}
 	defer req.Body.Close()
 
+	// dispatch msg based on type
+	var msg proto.Message
 	switch reqType {
 		case "FrameworkRegisteredMessage":
-			msg := new (mesos.FrameworkRegisteredMessage)
+			msg = new (mesos.FrameworkRegisteredMessage)
 			err = proto.Unmarshal(data, msg)
 			if err != nil {
 				code = http.StatusBadRequest
 				comment = "Error unmashalling FrameworkRegisteredMessage"
 			}
-			proc.eventMsgQ <- *msg
+			
 		default:
 			code = http.StatusBadRequest
 			comment = reqType +  " unrecognized."
 	}
-	// 
-	//<dispatch internal handler here ...> {} 
-	//
+	
+	proc.eventMsgQ <- msg
+
 	rsp.WriteHeader(code)
 	if comment != ""{
 		fmt.Fprintln(rsp, comment)
