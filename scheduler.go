@@ -13,9 +13,11 @@ type Scheduler interface {
 type SchedulerDriver struct {
 	Master string
 	Scheduler *Scheduler
+	FrameworkInfo *mesos.FrameworkInfo
+	schedProc schedulerProcess
 }
 
-func NewSchedDriver(scheduler *Scheduler, framework mesos.FrameworkInfo, master string) *SchedulerDriver {
+func NewSchedDriver(scheduler *Scheduler, framework *mesos.FrameworkInfo, master string) *SchedulerDriver {
 	// things to do here:
 	// ensure framework.user is set
 	// if scheduler is null, abort

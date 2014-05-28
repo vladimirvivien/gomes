@@ -1,7 +1,6 @@
 package gomes
 
 import (
-	"os"
 	"fmt"
 	"path"
 	"strconv"
@@ -18,8 +17,39 @@ func newID(prefix string) ID {
 	return ID(prefix + "(" + strconv.Itoa(rand.Intn(5)) + ")")
 }
 
+/*
+SchedHttpProcess manages http requests from the connected master.
+It wraps the standard Http Server.
+*/
+type schedulerProcess struct {
+	server *http.Server
+	processId string
+	eventMsgQ chan interface{}
+}
 
-var schedHttpHandler = func (rsp http.ResponseWriter, req *http.Request) {
+// newSchedHttpProcess creates and starts htttp process.
+func newSchedulerProcess (addr string, eventQ chan interface{}) *schedulerProcess {
+	serv := &http.Server {
+		Addr: addr,
+	}
+
+	// localHost,err := os.Hostname()
+	// if (err != nil){
+	// 	localHost = "localhost"
+	// }
+
+	pid := string(newID("scheduler")) + addr
+
+	proc := &schedulerProcess{
+		server:serv, 
+		processId:pid,
+		eventMsgQ:eventQ,
+	}
+	
+	return proc
+}
+
+func (proc *schedulerProcess) ServeHTTP (rsp http.ResponseWriter, req *http.Request) {
 	code := http.StatusAccepted
 	var comment string = ""
 
@@ -41,6 +71,7 @@ var schedHttpHandler = func (rsp http.ResponseWriter, req *http.Request) {
 				code = http.StatusBadRequest
 				comment = "Error unmashalling FrameworkRegisteredMessage"
 			}
+			proc.eventMsgQ <- *msg
 		default:
 			code = http.StatusBadRequest
 			comment = reqType +  " unrecognized."
@@ -54,39 +85,9 @@ var schedHttpHandler = func (rsp http.ResponseWriter, req *http.Request) {
 	}
 }
 
-/*
-SchedHttpProcess manages http requests from the connected master.
-It wraps the standard Http Server.
-*/
-type schedHttpProcess struct {
-	server *http.Server
-	processId string
-	httpHandler func (http.ResponseWriter, *http.Request) 
-}
-
-// newSchedHttpProcess creates and starts htttp process.
-func newSchedHttpProcess (port int) *schedHttpProcess {
-	portStr := strconv.Itoa(port)
-	serv := &http.Server {
-		Addr: ":" + portStr,
-	}
-
-	localHost,err := os.Hostname()
-	if (err != nil){
-		localHost = "localhost"
-	}
-
-	pid := string(newID("scheduler")) + localHost + ":" + portStr
-
-	return &schedHttpProcess{
-		server:serv, 
-		processId:pid,
-		httpHandler:schedHttpHandler,
-	}
-}
 
 // Starts the http process
-func (proc *schedHttpProcess) start() {
-	http.HandleFunc("/scheduler/FrameworkRegistered", proc.httpHandler)
+func (proc *schedulerProcess) start() {
+	http.Handle("/scheduler/FrameworkRegistered", proc)
 	go proc.server.ListenAndServe()
 }
