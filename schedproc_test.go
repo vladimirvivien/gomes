@@ -18,19 +18,22 @@ func TestIdType(t *testing.T) {
 	}
 }
 
-// func TestSchedProcCreation(t *testing.T) {
-// 	proc := newSchedulerProcess(":4000", make(chan interface{}))
-// 	if proc.server == nil {
-// 		t.Error("SchedHttpProcess missing server")
-// 	}
-// 	if proc.server.Addr != ":4000" {
-// 		t.Error("SchedHttpProcess not setting address properly")
-// 	}
-// 	idreg := regexp.MustCompile(`^[a-z]+\(\d+\).*$`)
-// 	if  !idreg.MatchString(proc.processId) {
-// 			t.Fatalf("ID value malformed. Got [%s]", proc)
-// 	}
-// }
+func TestSchedProcCreation(t *testing.T) {
+	proc, err := newSchedulerProcess(":4000", make(chan interface{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if proc.server == nil {
+		t.Error("SchedHttpProcess missing server")
+	}
+	if proc.server.Addr != ":4000" {
+		t.Error("SchedHttpProcess not setting address properly")
+	}
+	idreg := regexp.MustCompile(`^[a-z]+\(\d+\).*$`)
+	if  !idreg.MatchString(proc.processId) {
+			t.Fatalf("ID value malformed. Got [%s]", proc)
+	}
+}
 
 func TestFrameworkRegisteredMessage(t *testing.T) {
 	// setup chanel to receive unmarshalled message
@@ -51,7 +54,10 @@ func TestFrameworkRegisteredMessage(t *testing.T) {
 	}()
 
 	// Simulate FramworkRegisteredMessage request from master.
-	proc := newSchedulerProcess(":0606", eventQ)
+	proc, err := newSchedulerProcess(":0606", eventQ)
+	if err != nil {
+		t.Fatal (err)
+	}
 	msg := &mesos.FrameworkRegisteredMessage {
 		FrameworkId: &mesos.FrameworkID{Value: proto.String("test-framework-1")},
 		MasterInfo: &mesos.MasterInfo{

@@ -24,11 +24,15 @@ It wraps the standard Http Server.
 type schedulerProcess struct {
 	server *http.Server
 	processId string
-	eventMsgQ chan interface{}
+	eventMsgQ chan<- interface{}
 }
 
 // newSchedHttpProcess creates and starts htttp process.
-func newSchedulerProcess (addr string, eventQ chan interface{}) *schedulerProcess {
+func newSchedulerProcess (addr string, eventQ chan<- interface{}) (*schedulerProcess, error) {
+	if eventQ == nil {
+		return nil, fmt.Errorf("SchedulerProcess - eventQ parameber cannot be nil.")
+	}
+
 	serv := &http.Server {
 		Addr: addr,
 	}
@@ -41,10 +45,10 @@ func newSchedulerProcess (addr string, eventQ chan interface{}) *schedulerProces
 		eventMsgQ:eventQ,
 	}
 	
-	return proc
+	return proc, nil
 }
 
-func (proc *schedulerProcess) ServeHTTP (rsp http.ResponseWriter, req *http.Request) {
+func (proc *schedulerProcess) ServeHTTP(rsp http.ResponseWriter, req *http.Request) {
 	code := http.StatusAccepted
 	var comment string = ""
 
