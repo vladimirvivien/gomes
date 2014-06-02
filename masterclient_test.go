@@ -2,7 +2,7 @@ package gomes
 
 import (
 	"log"
-	"fmt"
+	_"fmt"
 	"net/url"
 	"net/http"
 	"net/http/httptest"
@@ -19,7 +19,7 @@ func TestAddressType(t *testing.T) {
 		t.Error("Address type value not translated to string")
 	}
 
-	u, err := addr.AsURL()
+	u, err := addr.AsHttpURL()
 	if(err != nil ){
 		t.Error("address.AsURL() failed:", err)
 	}
@@ -69,7 +69,7 @@ func TestMasterClient_RegisterFramework(t *testing.T) {
 		}
 
 		rsp.WriteHeader(http.StatusAccepted)
-		fmt.Print (rsp)
+		//fmt.Print (rsp)
 
 	})
 	defer server.Close()
@@ -84,7 +84,7 @@ func TestMasterClient_RegisterFramework(t *testing.T) {
 		Id:&mesos.FrameworkID{Value: proto.String("test-framework-1")},
 	}
 
-	master.RegisterFramework(newID("scheduler"),framework)
+	master.RegisterFramework(newSchedProcID(":7000"),framework)
 }
 
 func makeMockServer(handler func (rsp http.ResponseWriter, req *http.Request)) *httptest.Server{

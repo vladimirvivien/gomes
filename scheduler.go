@@ -8,7 +8,6 @@ import (
     proto "code.google.com/p/goprotobuf/proto"
 )
 
-
 type Scheduler interface {
 	Registered(schedulerDriver *SchedulerDriver, frameworkId *mesos.FrameworkID, masterInfo *mesos.MasterInfo)
 }
@@ -18,6 +17,7 @@ type SchedulerDriver struct {
 	Scheduler Scheduler
 	FrameworkInfo *mesos.FrameworkInfo
 
+	masterClient *masterClient
 	schedMsgQ chan interface{}
 	schedProc *schedulerProcess
 }
@@ -65,10 +65,13 @@ func NewSchedDriver(scheduler Scheduler, framework *mesos.FrameworkInfo, master 
 	
 	go setupSchedMsgQ(driver)
 
+	driver.masterClient = newMasterClient(master)
+
 	return driver, nil
 }
 
 func (driver *SchedulerDriver) Start() (error) {
+	driver.masterClient.RegisterFramework(driver.schedProc.processId, driver.FrameworkInfo)
 	// spin up eventQ processor
 	return nil
 }

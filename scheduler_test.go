@@ -1,7 +1,7 @@
 package gomes
 
 import (
-	_"log"
+	"log"
 	"os"
 	"os/user"
 	"testing"
@@ -68,8 +68,10 @@ func TestCreateNewSchedProc(t *testing.T) {
 }
 
 
-type MockScheduler string
-func (sched MockScheduler) Registered(driver *SchedulerDriver, frameworkId *mesos.FrameworkID, masterInfo *mesos.MasterInfo){
+type mockScheduler string
+func (sched mockScheduler) Registered(driver *SchedulerDriver, frameworkId *mesos.FrameworkID, masterInfo *mesos.MasterInfo){
+	log.Println ("mockScheduler.Registered() called...")
+	log.Println ("MasterInfo.Id", masterInfo.GetId())
 	if driver == nil {
 		panic("Scheduler.Registered expects a SchedulerDriver, but got nil.")
 	}
@@ -82,17 +84,18 @@ func (sched MockScheduler) Registered(driver *SchedulerDriver, frameworkId *meso
 	if masterInfo == nil {
 		panic("Scheduler.Registered expects masterInfo, but got nil")
 	}
-	if masterInfo.GetId() != "master-1" &&
-	   masterInfo.GetIp() != 123456 &&
+
+	if masterInfo.GetId() != "localhost:5050" ||
+	   masterInfo.GetIp() != 123456 ||
 	   masterInfo.GetPort() != 12345 {
 	   	panic("Scheduler.Registered expected MasterInfo values are missing.")
 	}
 }
 
-func TestFrameworkRegisteredMessage(t *testing.T) {
+func TestFrameworkRegisteredMessageHandling(t *testing.T) {
 	
 	driver := &SchedulerDriver {
-		Scheduler : MockScheduler("Mock"),
+		Scheduler : mockScheduler("Mock"),
 		schedMsgQ : make(chan interface{}),
 	}
 	go setupSchedMsgQ(driver)
@@ -100,7 +103,7 @@ func TestFrameworkRegisteredMessage(t *testing.T) {
 	msg := &mesos.FrameworkRegisteredMessage {
 		FrameworkId: &mesos.FrameworkID{Value: proto.String("test-framework-1")},
 		MasterInfo: &mesos.MasterInfo{
-			Id:proto.String("master-1"),
+			Id:proto.String("localhost:5050"),
 			Ip:proto.Uint32(123456),
 			Port:proto.Uint32(12345),
 		},

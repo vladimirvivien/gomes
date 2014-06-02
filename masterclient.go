@@ -2,19 +2,20 @@ package gomes
 
 import (
 	"net"
+	"fmt"
     "net/http"
-    "net/http/httputil"
     "net/url"
     "bytes"
     "time"
-    "log"
-    "os"
+    _"log"
     mesos "github.com/vladimirvivien/gomes/mesosproto"
     "code.google.com/p/goprotobuf/proto"
 )
 
 const (
 	MESOS_INTERNAL_PREFIX	= "mesos.internal."
+	MESOS_SCHEDULER_PREFIX	= "scheduler"
+	HTTP_SCHEDULER_PORT		= 51515
 	HTTP_SCHEME 			= "http"
 	HTTP_POST_METHOD		= "POST"
 	HTTP_MASTER_PREFIX		= "master"
@@ -27,8 +28,11 @@ const (
 
 
 type address string
-func (addr address) AsURL()(*url.URL, error){
-	return url.Parse(HTTP_SCHEME + "://" + string(addr))
+func (addr address) AsFullHttpURL(path string) (*url.URL, error){
+	return url.Parse(HTTP_SCHEME + "://" + string(addr) + "/" + path)
+}
+func (addr address) AsHttpURL()(*url.URL, error){
+	return addr.AsFullHttpURL("")
 }
 
 type masterClient struct {
@@ -54,37 +58,36 @@ func newMasterClient(master string) *masterClient {
 	}
 }
 
-func (client *masterClient) RegisterFramework(schedulerId ID, framework *mesos.FrameworkInfo) (error){
-	u, err := client.address.AsURL()
+func (client *masterClient) RegisterFramework(schedId schedProcID, framework *mesos.FrameworkInfo) (error){
+	// prepare registration data
+	regMsg := &mesos.RegisterFrameworkMessage{Framework:framework}
+	return client.send (schedId, buildReqPath(MESSAGE_REG_FRAMEWORK), regMsg)
+}
+
+func (client *masterClient) send (from schedProcID, reqPath string, msg proto.Message) error {
+	u, err := client.address.AsHttpURL()
 	if(err != nil){
 		return err
 	}
-	// build Master path
-	u.Path = buildReqPath(MESSAGE_REG_FRAMEWORK)
+	u.Path = reqPath
 
-	// prepare registration data
-	regMsg := &mesos.RegisterFrameworkMessage{Framework:framework}
-	data, err := proto.Marshal(regMsg)
+	data, err := proto.Marshal(msg)
 	if (err != nil){
 		return err
 	}
-
-	// prepare HTTP requrest
-	localHost,err := os.Hostname()
-	if (err != nil){
-		return nil
-	}
-	localHost = string(schedulerId) + localHost + ":" + "5050"
 
 	req, err := http.NewRequest(HTTP_POST_METHOD, u.String(), bytes.NewReader(data))
 	req.Header.Add("Content-Type", HTTP_CONTENT_TYPE)
 	req.Header.Add("Connection", "Keep-Alive")
-	req.Header.Add("Libprocess-From", localHost)
+	req.Header.Add("Libprocess-From", from.value)
 
-	_, err = client.httpClient.Do(req)
+	rsp, err := client.httpClient.Do(req)
 	
 	if err != nil {
 		return err
+	}
+	if rsp.StatusCode != http.StatusAccepted {
+		return fmt.Errorf("Master did not accept request %s.  Returned status %s.", u.String(), rsp.Status)
 	}
 
 	return nil
@@ -97,13 +100,3 @@ func buildReqPath(message string) string {
 // a generic send function. Will build message path based on msg type.
 // func (client *masterClient) send(msg proto.ProtoMessage) (error) {
 // }
-
-func dumpReq (req *http.Request) {
-	out, _ := httputil.DumpRequestOut(req, false)
-	log.Println ("Request Body:\n", string(out))
-}
-
-func dumpRsp (rsp *http.Response) {
-	out, _ := httputil.DumpResponse(rsp, false)
-	log.Println ("Response Body:\n", string(out))	
-}

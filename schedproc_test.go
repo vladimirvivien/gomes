@@ -10,11 +10,28 @@ import (
 	mesos "github.com/vladimirvivien/gomes/mesosproto"
 )
 
-func TestIdType(t *testing.T) {
-	re := regexp.MustCompile(`^[a-z]+\(\d+\)$`)
-	id := newID("scheduler")
-	if !re.MatchString(string(id)) {
-		t.Error("Type ID not generating proper ID value")
+func TestNewSchedID(t *testing.T) {
+	re1 := regexp.MustCompile(`^[a-z]+\(1\)@.*$`)
+	id1 := newSchedProcID(":5000")
+	if !re1.MatchString(string(id1.value)) {
+		t.Error("SchedID not generated properly:", id1.value)
+	}
+
+	id2 := newSchedProcID(":6000")
+	re2 := regexp.MustCompile(`^[a-z]+\(2\)@.*$`)
+	if !re2.MatchString(string(id2.value)) {
+		t.Error("SchedID not generated properly.  Expected prefix scheduler(2):", id1.value)
+	}
+	if id2.prefix != MESOS_SCHEDULER_PREFIX{
+		t.Error("SchedID has invalid prefix: ", id2.prefix)
+	}
+}
+
+func TestNewFullSchedID(t *testing.T) {
+	re1 :=regexp.MustCompile(`scheduler\(\d\)@machine1:4040`)
+	id1 := newSchedProcID("machine1:4040")
+	if !re1.MatchString(id1.value){
+		t.Errorf("Expecting SchedID [%s], but got [%s]", `scheduler\(\d\)@machine1:4040`, id1.value)
 	}
 }
 
@@ -30,7 +47,7 @@ func TestSchedProcCreation(t *testing.T) {
 		t.Error("SchedHttpProcess not setting address properly")
 	}
 	idreg := regexp.MustCompile(`^[a-z]+\(\d+\).*$`)
-	if  !idreg.MatchString(proc.processId) {
+	if  !idreg.MatchString(proc.processId.value) {
 			t.Fatalf("ID value malformed. Got [%s]", proc)
 	}
 }
@@ -85,8 +102,7 @@ func TestSchedHttpProcStart(t *testing.T) {
 }
 
 func buildHttpRequest(t *testing.T, msgName string, data []byte) *http.Request{
-	u, _ := address("127.0.0.1:5151").AsURL()
-	u.Path="/scheduler(1)/"+msgName
+	u, _ := address("127.0.0.1:5151").AsFullHttpURL("/scheduler(1)/"+msgName)
 	req, err := http.NewRequest(HTTP_POST_METHOD, u.String(), bytes.NewReader(data))
 	if err != nil {
 		t.Fatal(err)

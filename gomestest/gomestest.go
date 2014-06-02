@@ -8,18 +8,17 @@ import (
 )
 
 func main() {
-	master := gomes.NewMasterClient(gomes.PID("master@127.0.0.1:5050"))
-	schedulerId := gomes.PID("scheduler(1)@127.0.0.1:8080")
+	master := gomes.newMasterClient("127.0.0.1:5050")
+	schedulerId := gomes.newSchedID("127.0.0.1:50505")
 
-	regInfo := &mesos.RegisterFrameworkMessage{
-			Framework: &mesos.FrameworkInfo {
+	framework := &mesos.FrameworkInfo {
 			User: proto.String("test"),
 			Name: proto.String("gomes"),
 			Id:&mesos.FrameworkID{Value: proto.String("gomes-framework-1")},
 		},
 	}
 
-	err := master.RegisterFramework(schedulerId,*regInfo)
+	err := master.RegisterFramework(schedulerId,*framework)
 
 	if err != nil {
 		fmt.Println ("Encountered error ", err)

@@ -3,18 +3,33 @@ package gomes
 import (
 	"fmt"
 	"path"
+	"sync"
 	"strconv"
+	"net/url"
 	"net/http"
-	"math/rand"
 	"io/ioutil"
     mesos "github.com/vladimirvivien/gomes/mesosproto"
     "code.google.com/p/goprotobuf/proto"
 
 )
 
-type ID string
-func newID(prefix string) ID {
-	return ID(prefix + "(" + strconv.Itoa(rand.Intn(5)) + ")")
+var schedIdMutex = new(sync.Mutex)
+var schedIdCounter = 0
+type schedProcID struct {
+	prefix string
+	value string
+}
+func newSchedProcID(addr string) schedProcID {
+	cntStr := strconv.Itoa(schedIdCounter)
+	value := MESOS_SCHEDULER_PREFIX + "(" +  cntStr + ")@" + addr
+	id := schedProcID{prefix:MESOS_SCHEDULER_PREFIX,value:value}
+	schedIdMutex.Lock()
+	schedIdCounter = schedIdCounter + 1
+	schedIdMutex.Unlock()
+	return id
+}
+func (id *schedProcID) asURL() (*url.URL, error){
+	return url.Parse("http://"+id.value)
 }
 
 /*
@@ -23,7 +38,7 @@ It wraps the standard Http Server.
 */
 type schedulerProcess struct {
 	server *http.Server
-	processId string
+	processId schedProcID
 	eventMsgQ chan<- interface{}
 }
 
@@ -37,11 +52,9 @@ func newSchedulerProcess (addr string, eventQ chan<- interface{}) (*schedulerPro
 		Addr: addr,
 	}
 
-	pid := string(newID("scheduler")) + addr
-
 	proc := &schedulerProcess{
 		server:serv, 
-		processId:pid,
+		processId:newSchedProcID(addr),
 		eventMsgQ:eventQ,
 	}
 	
