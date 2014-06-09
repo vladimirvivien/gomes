@@ -43,18 +43,17 @@ type schedulerProcess struct {
 }
 
 // newSchedHttpProcess creates and starts htttp process.
-func newSchedulerProcess (addr string, eventQ chan<- interface{}) (*schedulerProcess, error) {
+func newSchedulerProcess (eventQ chan<- interface{}) (*schedulerProcess, error) {
 	if eventQ == nil {
 		return nil, fmt.Errorf("SchedulerProcess - eventQ parameber cannot be nil.")
 	}
 
 	serv := &http.Server {
-		Addr: addr,
+		Addr: ":0",
 	}
 
 	proc := &schedulerProcess{
 		server:serv, 
-		processId:newSchedProcID(addr),
 		eventMsgQ:eventQ,
 	}
 	
@@ -103,5 +102,8 @@ func (proc *schedulerProcess) ServeHTTP(rsp http.ResponseWriter, req *http.Reque
 // Starts the http process
 func (proc *schedulerProcess) start() {
 	http.Handle("/scheduler/FrameworkRegistered", proc)
+	addr := fmt.Sprintf("%s:%d", localIP4String(), nextTcpPort())
+	proc.server.Addr = addr
 	go proc.server.ListenAndServe()
+	proc.processId = newSchedProcID(proc.server.Addr)
 }

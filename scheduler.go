@@ -57,12 +57,13 @@ func NewSchedDriver(scheduler Scheduler, framework *mesos.FrameworkInfo, master 
 		schedMsgQ: make(chan interface{}, 10),
 	}
 
-	proc, err := createNewSchedProc(driver)
-	if (err != nil){
+	proc,err := newSchedulerProcess(driver.schedMsgQ)
+	if err != nil {
 		return nil, err
 	}
-	driver.schedProc = proc
 	
+	driver.schedProc = proc
+
 	go setupSchedMsgQ(driver)
 
 	driver.masterClient = newMasterClient(master)
@@ -74,15 +75,6 @@ func (driver *SchedulerDriver) Start() (error) {
 	driver.masterClient.RegisterFramework(driver.schedProc.processId, driver.FrameworkInfo)
 	// spin up eventQ processor
 	return nil
-}
-
-func createNewSchedProc(driver *SchedulerDriver) (*schedulerProcess, error) {
-	localAddress, err := os.Hostname()
-	if err != nil {
-		localAddress = "localhost"
-	}
-
-	return newSchedulerProcess(localAddress, driver.schedMsgQ)
 }
 
 func setupSchedMsgQ(driver *SchedulerDriver){

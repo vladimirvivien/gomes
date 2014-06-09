@@ -1,6 +1,7 @@
 package gomes
 
 import (
+	"log"
 	"testing"
 	"regexp"
 	"bytes"
@@ -36,19 +37,12 @@ func TestNewFullSchedID(t *testing.T) {
 }
 
 func TestSchedProcCreation(t *testing.T) {
-	proc, err := newSchedulerProcess(":4000", make(chan interface{}))
+	proc, err := newSchedulerProcess(make(chan interface{}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if proc.server == nil {
 		t.Error("SchedHttpProcess missing server")
-	}
-	if proc.server.Addr != ":4000" {
-		t.Error("SchedHttpProcess not setting address properly")
-	}
-	idreg := regexp.MustCompile(`^[a-z]+\(\d+\).*$`)
-	if  !idreg.MatchString(proc.processId.value) {
-			t.Fatalf("ID value malformed. Got [%s]", proc)
 	}
 }
 
@@ -71,7 +65,7 @@ func TestFrameworkRegisteredMessage(t *testing.T) {
 	}()
 
 	// Simulate FramworkRegisteredMessage request from master.
-	proc, err := newSchedulerProcess(":0606", eventQ)
+	proc, err := newSchedulerProcess(eventQ)
 	if err != nil {
 		t.Fatal (err)
 	}
@@ -98,7 +92,18 @@ func TestFrameworkRegisteredMessage(t *testing.T) {
 }
 
 func TestSchedHttpProcStart(t *testing.T) {
-	//proc := newSchedHttpProcess(4000)
+	proc, err := newSchedulerProcess(make(chan interface{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	proc.start()
+	log.Println("*** Scheduler Proc server.addr =", proc.server.Addr, "***")
+	log.Println("*** Scheduler Proc ID =", proc.processId.value, "***")
+	idreg := regexp.MustCompile(`^[a-z]+\(\d+\).*$`)
+	if  !idreg.MatchString(proc.processId.value) {
+			t.Fatalf("ID value malformed. Got [%s]", proc.processId.value)
+	}
+
 }
 
 func buildHttpRequest(t *testing.T, msgName string, data []byte) *http.Request{

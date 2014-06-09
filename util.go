@@ -2,10 +2,11 @@ package gomes
 
 import (
 	"net"
+	"strconv"
 	"strings"
 )
 
-func hostIP4AsString() string {
+func localIP4String() string {
     addrs, _ := net.InterfaceAddrs()
 	for _, addr := range addrs {
 		switch addr.(type){
@@ -19,6 +20,13 @@ func hostIP4AsString() string {
 	return ""
 }
 
-func nextAvailbleTcpPort() int {
-	return 0
+func nextTcpPort() int {
+	l, err := net.Listen("tcp4", ":0")
+	defer l.Close()
+	addr :=  l.Addr().String()
+	port, err := strconv.Atoi(addr[strings.LastIndex(addr, ":")+1:])
+	if err != nil {
+		return 0
+	}
+	return port
 }

@@ -58,7 +58,7 @@ func TestCreateNewSchedProc(t *testing.T) {
 	driver := &SchedulerDriver {
 		schedMsgQ : make(chan interface{}),
 	}
-	proc, err := createNewSchedProc(driver)
+	proc, err := newSchedulerProcess(driver.schedMsgQ)
 	if err != nil {
 		t.Fatal("Error creating new SchedulerProcess:", err)
 	}
