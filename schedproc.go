@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path"
 	"sync"
+	"strings"
 	"strconv"
 	"net/url"
 	"net/http"
@@ -67,8 +68,10 @@ func (proc *schedulerProcess) ServeHTTP(rsp http.ResponseWriter, req *http.Reque
 	code := http.StatusAccepted
 	var comment string = ""
 
-	// decompose incoming request
-	_,reqType := path.Split(req.URL.Path)
+	// decompose incoming request path of expected form: 
+	// /scheduler(?)/mesos.internal.<MessageName>
+	_,internalName := path.Split(req.URL.Path)
+	messageType := strings.Split(internalName,".")[2] // last index is messageType.
 
 	data, err := ioutil.ReadAll(req.Body)
 	if err != nil{
@@ -79,7 +82,7 @@ func (proc *schedulerProcess) ServeHTTP(rsp http.ResponseWriter, req *http.Reque
 
 	// dispatch msg based on type
 	var msg proto.Message
-	switch reqType {
+	switch messageType {
 		case "FrameworkRegisteredMessage":
 			msg = new (mesos.FrameworkRegisteredMessage)
 			err = proto.Unmarshal(data, msg)
@@ -90,7 +93,7 @@ func (proc *schedulerProcess) ServeHTTP(rsp http.ResponseWriter, req *http.Reque
 			
 		default:
 			code = http.StatusBadRequest
-			comment = reqType +  " unrecognized."
+			comment = messageType +  " unrecognized."
 	}
 	
 	proc.eventMsgQ <- msg
@@ -108,8 +111,12 @@ func (proc *schedulerProcess) start() {
 	proc.processId = newSchedProcID(proc.server.Addr)
 
 	// register listners
-	procPath := fmt.Sprintf("/%s/FrameworkRegistered", proc.processId.prefix)
+	procPath := fmt.Sprintf("/%s/%s%s", 
+		proc.processId.prefix, 
+		MESOS_INTERNAL_PREFIX,
+		FRAMEWORK_REGD_MESSAGE)
 	http.Handle(procPath, proc)
+	fmt.Println ("*** Registered handler for path:",procPath)
 
 	go proc.server.ListenAndServe()
 }

@@ -119,7 +119,8 @@ func TestSchedHttpProcStart(t *testing.T) {
 }
 
 func buildHttpRequest(t *testing.T, msgName string, data []byte) *http.Request{
-	u, _ := address("127.0.0.1:5151").AsFullHttpURL("/scheduler(1)/"+msgName)
+	u, _ := address("127.0.0.1:5151").AsFullHttpURL(
+		"/scheduler(1)/"+MESOS_INTERNAL_PREFIX+msgName)
 	req, err := http.NewRequest(HTTP_POST_METHOD, u.String(), bytes.NewReader(data))
 	if err != nil {
 		t.Fatal(err)

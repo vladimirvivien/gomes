@@ -23,6 +23,7 @@ const (
 	HTTP_CONTENT_TYPE		= "application/x-protobuf"
 
 	MESSAGE_REG_FRAMEWORK 	= "RegisterFrameworkMessage"
+	FRAMEWORK_REGD_MESSAGE  = "FrameworkRegisteredMessage"
 
 )
 
