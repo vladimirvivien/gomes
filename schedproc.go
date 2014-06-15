@@ -21,8 +21,9 @@ type schedProcID struct {
 }
 func newSchedProcID(addr string) schedProcID {
 	cntStr := strconv.Itoa(schedIdCounter)
-	value := MESOS_SCHEDULER_PREFIX + "(" +  cntStr + ")@" + addr
-	id := schedProcID{prefix:MESOS_SCHEDULER_PREFIX,value:value}
+	prefix := MESOS_SCHEDULER_PREFIX + "(" +  cntStr + ")"
+	value := prefix + "@" + addr
+	id := schedProcID{prefix:prefix,value:value}
 	schedIdMutex.Lock()
 	schedIdCounter = schedIdCounter + 1
 	schedIdMutex.Unlock()
@@ -40,6 +41,7 @@ type schedulerProcess struct {
 	server *http.Server
 	processId schedProcID
 	eventMsgQ chan<- interface{}
+	controlQ chan int32
 }
 
 // newSchedHttpProcess creates and starts htttp process.
@@ -55,6 +57,7 @@ func newSchedulerProcess (eventQ chan<- interface{}) (*schedulerProcess, error) 
 	proc := &schedulerProcess{
 		server:serv, 
 		eventMsgQ:eventQ,
+		controlQ: make(chan int32),
 	}
 	
 	return proc, nil
@@ -99,11 +102,14 @@ func (proc *schedulerProcess) ServeHTTP(rsp http.ResponseWriter, req *http.Reque
 }
 
 
-// Starts the http process
-func (proc *schedulerProcess) start() {
-	http.Handle("/scheduler/FrameworkRegistered", proc)
-	addr := fmt.Sprintf("%s:%d", localIP4String(), nextTcpPort())
-	proc.server.Addr = addr
-	go proc.server.ListenAndServe()
+// start Starts an http process to listen to incoming events from Mesos.
+func (proc *schedulerProcess) start() {	
+	proc.server.Addr = fmt.Sprintf("%s:%d", localIP4String(), nextTcpPort())
 	proc.processId = newSchedProcID(proc.server.Addr)
+
+	// register listners
+	procPath := fmt.Sprintf("/%s/FrameworkRegistered", proc.processId.prefix)
+	http.Handle(procPath, proc)
+
+	go proc.server.ListenAndServe()
 }

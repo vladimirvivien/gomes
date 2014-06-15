@@ -3,6 +3,8 @@ package gomes
 import (
 	"log"
 	"os"
+	"net/http"
+	"net/url"
 	"os/user"
 	"testing"
 	mesos "github.com/vladimirvivien/gomes/mesosproto"
@@ -34,7 +36,7 @@ func TestScheDriverCreation(t *testing.T) {
 	}
 }
 
-func TestScheDriverCreation_WithFrameworkInfo_Override (t *testing.T) {
+func TestScheDriverCreation_WithFrameworkInfo_Override(t *testing.T) {
 	driver, err := NewSchedDriver(
 		nil, 
 		&mesos.FrameworkInfo{
@@ -54,24 +56,42 @@ func TestScheDriverCreation_WithFrameworkInfo_Override (t *testing.T) {
 	}
 }
 
-func TestCreateNewSchedProc(t *testing.T) {
-	driver := &SchedulerDriver {
-		schedMsgQ : make(chan interface{}),
-	}
-	proc, err := newSchedulerProcess(driver.schedMsgQ)
+func TestStartDriver(t *testing.T) {
+	// test server to accept Framework Registration 
+	server := makeMockServer(func (rsp http.ResponseWriter, req *http.Request){
+		rsp.WriteHeader(http.StatusAccepted)
+	})
+	defer server.Close()
+	url, _ := url.Parse(server.URL)
+	driver, err := NewSchedDriver(nil, makeMockFrameworkInfo(),url.Host)
 	if err != nil {
-		t.Fatal("Error creating new SchedulerProcess:", err)
+		t.Fatal ("Error creating SchedulerDriver", err)
 	}
-	if proc.server.Addr == "" {
-		t.Fatal("CreateNewSchedProc not setting default address")
+	stat := driver.Start()
+	if stat != mesos.Status_DRIVER_RUNNING {
+		t.Fatal("SchedulerDriver.start() - failed to start:", stat, ". Expecting DRIVER_RUNNING "	)
 	}
 }
 
+func TestStartDriver_WithNoMasterAvailable(t *testing.T) {
+	driver, err := NewSchedDriver(nil, makeMockFrameworkInfo(),"localhost:5050")
+	if err != nil {
+		t.Fatal ("Error creating SchedulerDriver", err)
+	}
+
+	stat := driver.Start()
+	if stat == mesos.Status_DRIVER_RUNNING {
+		t.Fatal("SchedulerDriver.start() - should failed due to connection refused, but got:", stat)
+	}
+}
+
+func TestJoinDriver(t *testing.T) {
+
+}
 
 type mockScheduler string
 func (sched mockScheduler) Registered(driver *SchedulerDriver, frameworkId *mesos.FrameworkID, masterInfo *mesos.MasterInfo){
 	log.Println ("mockScheduler.Registered() called...")
-	log.Println ("MasterInfo.Id", masterInfo.GetId())
 	if driver == nil {
 		panic("Scheduler.Registered expects a SchedulerDriver, but got nil.")
 	}
@@ -91,15 +111,12 @@ func (sched mockScheduler) Registered(driver *SchedulerDriver, frameworkId *meso
 	   	panic("Scheduler.Registered expected MasterInfo values are missing.")
 	}
 }
+func(sched mockScheduler) Error(driver *SchedulerDriver, err MesosError){
+	log.Println("mockScheduler.Error() called...")
+	log.Println("SchedulerDriver received an error: "+err.Error())
+}
 
 func TestFrameworkRegisteredMessageHandling(t *testing.T) {
-	
-	driver := &SchedulerDriver {
-		Scheduler : mockScheduler("Mock"),
-		schedMsgQ : make(chan interface{}),
-	}
-	go setupSchedMsgQ(driver)
-
 	msg := &mesos.FrameworkRegisteredMessage {
 		FrameworkId: &mesos.FrameworkID{Value: proto.String("test-framework-1")},
 		MasterInfo: &mesos.MasterInfo{
@@ -108,6 +125,14 @@ func TestFrameworkRegisteredMessageHandling(t *testing.T) {
 			Port:proto.Uint32(12345),
 		},
 	}
+	driver, err := NewSchedDriver(mockScheduler("Mock"), &mesos.FrameworkInfo{}, "localhost:5050")
+	if err != nil {
+		t.Fatal(err)
+	}
 	driver.schedMsgQ <- msg
 }
 
+func TestErrorMessageHandling(t *testing.T) {
+	driver, _ := NewSchedDriver(mockScheduler("Mock"), &mesos.FrameworkInfo{}, "localhost:5050")
+	driver.schedMsgQ <- "Hello"
+}

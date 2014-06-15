@@ -12,19 +12,21 @@ import (
 )
 
 func TestNewSchedID(t *testing.T) {
-	re1 := regexp.MustCompile(`^[a-z]+\(1\)@.*$`)
+	re1 := regexp.MustCompile(`^[a-z]+\(\d\)@.*$`)
 	id1 := newSchedProcID(":5000")
 	if !re1.MatchString(string(id1.value)) {
 		t.Error("SchedID not generated properly:", id1.value)
 	}
 
 	id2 := newSchedProcID(":6000")
-	re2 := regexp.MustCompile(`^[a-z]+\(2\)@.*$`)
+	re2 := regexp.MustCompile(`^[a-z]+\(\d\)@.*$`)
 	if !re2.MatchString(string(id2.value)) {
 		t.Error("SchedID not generated properly.  Expected prefix scheduler(2):", id1.value)
 	}
-	if id2.prefix != MESOS_SCHEDULER_PREFIX{
-		t.Error("SchedID has invalid prefix: ", id2.prefix)
+	id3 := newSchedProcID(":7000")
+	re3 := regexp.MustCompile(`^[a-z]+\(\d\)$`)
+	if !re3.MatchString (id3.prefix){
+		t.Error("SchedID has invalid prefix:", id3.prefix)
 	}
 }
 
@@ -96,10 +98,20 @@ func TestSchedHttpProcStart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	proc.start()
-	log.Println("*** Scheduler Proc server.addr =", proc.server.Addr, "***")
-	log.Println("*** Scheduler Proc ID =", proc.processId.value, "***")
-	idreg := regexp.MustCompile(`^[a-z]+\(\d+\).*$`)
+	
+	ctrlQ := make(chan int)
+	go func() {
+		proc.start()
+		log.Println ("Started Scheduler Process:", proc.server.Addr)
+		ctrlQ <- 1
+	}()
+	<- ctrlQ
+
+	// send test FrameworkRegistered messsage
+
+
+	log.Println("Scheduler Process started, ID =", proc.processId.value)
+	idreg := regexp.MustCompile(`^[a-z]+\(\d+\)@.*$`)
 	if  !idreg.MatchString(proc.processId.value) {
 			t.Fatalf("ID value malformed. Got [%s]", proc.processId.value)
 	}

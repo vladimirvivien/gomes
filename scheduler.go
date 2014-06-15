@@ -8,17 +8,26 @@ import (
     proto "code.google.com/p/goprotobuf/proto"
 )
 
-type Scheduler interface {
-	Registered(schedulerDriver *SchedulerDriver, frameworkId *mesos.FrameworkID, masterInfo *mesos.MasterInfo)
+type MesosError string
+func (err MesosError) Error() string {
+	return string(err)
 }
+
+type Scheduler interface {
+	Registered(schedDriver *SchedulerDriver, frameworkId *mesos.FrameworkID, masterInfo *mesos.MasterInfo)
+	Error(schedDriver *SchedulerDriver, err MesosError)
+}
+
 
 type SchedulerDriver struct {
 	Master string
 	Scheduler Scheduler
 	FrameworkInfo *mesos.FrameworkInfo
 
+	status mesos.Status
 	masterClient *masterClient
 	schedMsgQ chan interface{}
+	controlQ chan mesos.Status
 	schedProc *schedulerProcess
 }
 
@@ -54,7 +63,8 @@ func NewSchedDriver(scheduler Scheduler, framework *mesos.FrameworkInfo, master 
 		Master: master, 
 		Scheduler: scheduler, 
 		FrameworkInfo:framework,
-		schedMsgQ: make(chan interface{}, 10),
+		schedMsgQ: make(chan interface{}, 10), 
+		controlQ : make(chan mesos.Status),
 	}
 
 	proc,err := newSchedulerProcess(driver.schedMsgQ)
@@ -68,13 +78,50 @@ func NewSchedDriver(scheduler Scheduler, framework *mesos.FrameworkInfo, master 
 
 	driver.masterClient = newMasterClient(master)
 
+	driver.status = mesos.Status_DRIVER_NOT_STARTED
+
 	return driver, nil
 }
 
-func (driver *SchedulerDriver) Start() (error) {
-	driver.masterClient.RegisterFramework(driver.schedProc.processId, driver.FrameworkInfo)
-	// spin up eventQ processor
-	return nil
+func (driver *SchedulerDriver) Start() mesos.Status {
+	if driver.status != mesos.Status_DRIVER_NOT_STARTED {
+		return driver.status
+	}
+	driver.schedProc.start() 
+	
+	// TODO: should ping scheduler process here to make sure 
+	// http process is up and running with no issue.
+	err := driver.masterClient.RegisterFramework(driver.schedProc.processId, driver.FrameworkInfo)
+	if err != nil {
+		driver.status = mesos.Status_DRIVER_NOT_STARTED
+		if driver.Scheduler != nil {
+			driver.Scheduler.Error(driver, MesosError("Failed to register the framework:"+err.Error()))
+		}
+	}else{
+		driver.status = mesos.Status_DRIVER_RUNNING
+	}
+	return driver.status
+}
+
+func (driver *SchedulerDriver) Join() mesos.Status {
+	if driver.status != mesos.Status_DRIVER_RUNNING{
+		return driver.status
+	}
+
+	return <-driver.controlQ
+}
+
+func (driver *SchedulerDriver) Run() mesos.Status {
+	go func(){
+		stat := driver.Start()
+		driver.controlQ <- stat
+	}()
+	stat := <- driver.controlQ
+
+	if stat != mesos.Status_DRIVER_RUNNING{
+		return stat
+	}
+	return driver.Join()
 }
 
 func setupSchedMsgQ(driver *SchedulerDriver){
@@ -86,7 +133,11 @@ func setupSchedMsgQ(driver *SchedulerDriver){
 				if ok && sched != nil {
 					sched.Registered(driver, msg.FrameworkId, msg.MasterInfo)
 				}
+				if !ok && sched != nil {
+					sched.Error(driver, "Failed to cast received Protobuf.Message to mesos.FrameworkRegisteredMessage")
+				}
 			default:
+				sched.Error(driver, "Received unexpected event from server.")
 		}
 	}
 }

@@ -31,7 +31,22 @@ func TestAddressType(t *testing.T) {
 	}
 }
 
-func TestMasterClient_RegisterFramework(t *testing.T) {
+func TestRegisterFramework_BadAddr(t *testing.T) {
+	master := newMasterClient("localhost:1010")
+
+	framework := &mesos.FrameworkInfo {
+		User:proto.String("test-user"),
+		Name:proto.String("test-name"),
+		Id:&mesos.FrameworkID{Value: proto.String("test-framework-1")},
+	}
+
+	err := master.RegisterFramework(newSchedProcID(":7000"),framework)
+	if err == nil {
+		t.Fatal("Expecting 'Connection Refused' error, but test did not fail.")
+	}
+}
+
+func TestRegisterFramework(t *testing.T) {
 	idreg := regexp.MustCompile(`^[a-z]+\(\d+\).*$`)
 
 	// Server-side Validation
@@ -91,4 +106,12 @@ func makeMockServer(handler func (rsp http.ResponseWriter, req *http.Request)) *
 	server := httptest.NewServer(http.HandlerFunc(handler))
 	log.Println("Created server  " + server.URL)
 	return server
+}
+
+func makeMockFrameworkInfo() *mesos.FrameworkInfo {
+	return &mesos.FrameworkInfo {
+		User:proto.String("test-user"),
+		Name:proto.String("test-name"),
+		Id:&mesos.FrameworkID{Value: proto.String("test-framework-1")},
+	}
 }

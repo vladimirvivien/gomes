@@ -75,21 +75,17 @@ func (client *masterClient) send (from schedProcID, reqPath string, msg proto.Me
 	if (err != nil){
 		return err
 	}
-
 	req, err := http.NewRequest(HTTP_POST_METHOD, u.String(), bytes.NewReader(data))
 	req.Header.Add("Content-Type", HTTP_CONTENT_TYPE)
 	req.Header.Add("Connection", "Keep-Alive")
 	req.Header.Add("Libprocess-From", from.value)
-
 	rsp, err := client.httpClient.Do(req)
-	
 	if err != nil {
 		return err
 	}
 	if rsp.StatusCode != http.StatusAccepted {
 		return fmt.Errorf("Master did not accept request %s.  Returned status %s.", u.String(), rsp.Status)
 	}
-
 	return nil
 }
 
