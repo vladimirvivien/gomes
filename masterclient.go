@@ -16,10 +16,17 @@ import (
 type address string
 
 func (addr address) AsFullHttpURL(path string) (*url.URL, error) {
-	return url.Parse(HTTP_SCHEME + "://" + string(addr) + "/" + path)
+	return &url.URL{
+		Scheme: HTTP_SCHEME,
+		Host:   string(addr),
+		Path:   path,
+	}, nil
 }
 func (addr address) AsHttpURL() (*url.URL, error) {
-	return addr.AsFullHttpURL("")
+	return &url.URL{
+		Scheme: HTTP_SCHEME,
+		Host:   string(addr),
+	}, nil
 }
 
 type masterClient struct {
