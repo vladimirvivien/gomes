@@ -12,22 +12,6 @@ import (
     "code.google.com/p/goprotobuf/proto"
 )
 
-const (
-	MESOS_INTERNAL_PREFIX	= "mesos.internal."
-	MESOS_SCHEDULER_PREFIX	= "scheduler"
-	HTTP_SCHEDULER_PORT		= 51515
-	HTTP_SCHEME 			= "http"
-	HTTP_POST_METHOD		= "POST"
-	HTTP_MASTER_PREFIX		= "master"
-	HTTP_LIBPROC_PREFIX 	= "libprocess/"
-	HTTP_CONTENT_TYPE		= "application/x-protobuf"
-
-	MESSAGE_REG_FRAMEWORK 	= "RegisterFrameworkMessage"
-	FRAMEWORK_REGD_MESSAGE  = "FrameworkRegisteredMessage"
-
-)
-
-
 type address string
 func (addr address) AsFullHttpURL(path string) (*url.URL, error){
 	return url.Parse(HTTP_SCHEME + "://" + string(addr) + "/" + path)
@@ -62,7 +46,7 @@ func newMasterClient(master string) *masterClient {
 func (client *masterClient) RegisterFramework(schedId schedProcID, framework *mesos.FrameworkInfo) (error){
 	// prepare registration data
 	regMsg := &mesos.RegisterFrameworkMessage{Framework:framework}
-	return client.send (schedId, buildReqPath(MESSAGE_REG_FRAMEWORK), regMsg)
+	return client.send (schedId, buildReqPath(REGISTER_FRAMEWORK_CALL), regMsg)
 }
 
 func (client *masterClient) send (from schedProcID, reqPath string, msg proto.Message) error {

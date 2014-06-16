@@ -55,7 +55,7 @@ func TestRegisterFramework(t *testing.T) {
 			t.Fatalf("Expected Connection Header not found")
 		}
 		
-		cmdPath := buildReqPath(MESSAGE_REG_FRAMEWORK)
+		cmdPath := buildReqPath(REGISTER_FRAMEWORK_CALL)
 		if req.URL.Path != cmdPath {
 			t.Fatalf("Expected URL path not found.")
 		}

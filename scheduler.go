@@ -9,12 +9,17 @@ import (
 )
 
 type MesosError string
+func NewMesosError(msg string) MesosError{
+	return MesosError(msg)
+}
 func (err MesosError) Error() string {
 	return string(err)
 }
 
 type Scheduler interface {
 	Registered(schedDriver *SchedulerDriver, frameworkId *mesos.FrameworkID, masterInfo *mesos.MasterInfo)
+	Reregistered(schedDriver *SchedulerDriver, masterInfo *mesos.MasterInfo)
+	ResourceOffers(schedDriver *SchedulerDriver, offers []*mesos.Offer)
 	Error(schedDriver *SchedulerDriver, err MesosError)
 }
 
@@ -129,13 +134,23 @@ func setupSchedMsgQ(driver *SchedulerDriver){
 	for event := range driver.schedMsgQ {
 		switch event.(type) {
 			case *mesos.FrameworkRegisteredMessage:
-				msg, ok := event.(*mesos.FrameworkRegisteredMessage)
-				if ok && sched != nil {
-					sched.Registered(driver, msg.FrameworkId, msg.MasterInfo)
+				if msg, ok := event.(*mesos.FrameworkRegisteredMessage); ok {
+					go sched.Registered(driver, msg.FrameworkId, msg.MasterInfo)
+				}else {
+					go sched.Error(driver, "Failed to cast received Protobuf.Message to mesos.FrameworkRegisteredMessage")
 				}
-				if !ok && sched != nil {
-					sched.Error(driver, "Failed to cast received Protobuf.Message to mesos.FrameworkRegisteredMessage")
+			case *mesos.FrameworkReregisteredMessage:
+				if msg, ok := event.(*mesos.FrameworkReregisteredMessage); ok {
+					go sched.Reregistered(driver, msg.MasterInfo)
+				}else {
+					go sched.Error(driver, "Failed to cast received Protobuf.Message to mesos.FrameworkReregisteredMessage")
 				}
+			case *mesos.ResourceOffersMessage:
+				if msg, ok := event.(*mesos.ResourceOffersMessage); ok {
+					go sched.ResourceOffers(driver, msg.Offers)
+				}else {
+					go sched.Error(driver, "Failed to cast received Protobuf.Message to mesos.FrameworkRegisteredMessage")
+				}								
 			default:
 				sched.Error(driver, "Received unexpected event from server.")
 		}

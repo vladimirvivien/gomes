@@ -86,8 +86,100 @@ func TestFrameworkRegisteredMessage(t *testing.T) {
 
 	req := buildHttpRequest(t, "FrameworkRegisteredMessage", data)
 	resp := httptest.NewRecorder()
+	
 	// ServeHTTP will unmarshal msg and place on passed channel (above)
 	proc.ServeHTTP(resp, req)
+	
+	if resp.Code != http.StatusAccepted {
+		t.Fatalf("Expecting server status %d but got status %d", http.StatusAccepted, resp.Code)
+	}
+}
+
+func TestFrameworkReRegisteredMessage(t *testing.T) {
+	// setup chanel to receive unmarshalled message
+	eventQ := make(chan interface{})
+	go func() {
+		for msg := range eventQ{
+			val, ok := msg.(*mesos.FrameworkReregisteredMessage)
+			if !ok {
+				t.Fatal("Failed to receive msg of type FrameworkReregisteredMessage")
+			}			
+			if val.MasterInfo.GetId() != "master-1" {
+				t.Fatal("Expected FrameworkRegisteredMessage.Master.Id not found.")
+			}
+		}
+	}()
+
+	// Simulate FramworkReregisteredMessage request from master.
+	proc, err := newSchedulerProcess(eventQ)
+	if err != nil {
+		t.Fatal (err)
+	}
+	msg := &mesos.FrameworkReregisteredMessage {
+		FrameworkId: &mesos.FrameworkID{Value: proto.String("test-framework-1")},
+		MasterInfo: &mesos.MasterInfo{
+			Id:proto.String("master-1"),
+			Ip:proto.Uint32(123456),
+			Port:proto.Uint32(12345),
+		},
+	}
+	data, err := proto.Marshal(msg)
+	if (err != nil){
+		t.Fatalf("Unable to marshal FrameworkReregisteredMessage, %v", err)
+	}
+
+	req := buildHttpRequest(t, "FrameworkReregisteredMessage", data)
+	resp := httptest.NewRecorder()
+	
+	// ServeHTTP will unmarshal msg and place on passed channel (above)
+	proc.ServeHTTP(resp, req)
+	
+	if resp.Code != http.StatusAccepted {
+		t.Fatalf("Expecting server status %d but got status %d", http.StatusAccepted, resp.Code)
+	}
+}
+
+func TestResourceOffersMessage (t *testing.T) {
+	eventQ := make(chan interface{})
+	go func() {
+		for msg := range eventQ{
+			val, ok := msg.(*mesos.ResourceOffersMessage)
+			if !ok {
+				t.Fatal("Failed to receive msg of type ResourceOffersMessage")
+			}
+			if len(val.Offers) != 1 {
+				t.Fatal("SchedProc not receiving ResourceOffersMessage properly. ")
+			}
+		}
+	}()
+
+	proc, err := newSchedulerProcess(eventQ)
+	if err != nil {
+		t.Fatal (err)
+	}
+
+	msg := &mesos.ResourceOffersMessage {
+		Offers : []*mesos.Offer {
+			&mesos.Offer{
+				Id : &mesos.OfferID{Value: proto.String("offer-1")},
+				FrameworkId: &mesos.FrameworkID{Value: proto.String("test-framework-1")},
+				SlaveId: &mesos.SlaveID{Value: proto.String("test-slave-1")},
+				Hostname: proto.String("localhost"),
+			},
+		},	
+	}
+
+	data, err := proto.Marshal(msg)
+	if (err != nil){
+		t.Fatalf("Unable to marshal ResourceOffersMessage, %v", err)
+	}
+
+	req := buildHttpRequest(t, "ResourceOffersMessage", data)
+	resp := httptest.NewRecorder()
+	
+	// ServeHTTP will unmarshal msg and place on passed channel (above)
+	proc.ServeHTTP(resp, req)
+	
 	if resp.Code != http.StatusAccepted {
 		t.Fatalf("Expecting server status %d but got status %d", http.StatusAccepted, resp.Code)
 	}
