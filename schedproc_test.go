@@ -48,6 +48,26 @@ func TestSchedProcCreation(t *testing.T) {
 	}
 }
 
+func TestScheProcError(t *testing.T) {
+	eventQ := make(chan interface{})
+	go func() {
+		msg := <- eventQ 
+		if val, ok := msg.(error); !ok {
+			t.Fatalf("Expected message of type error, but got %T", msg)
+		}else{
+			log.Println("*** Error in Q", val, "***") 
+		}
+	}()
+	
+	proc, err := newSchedulerProcess(eventQ)
+	if err != nil {
+		t.Fatal (err)
+	}
+	req := buildHttpRequest(t, "FrameworkRegisteredMessage", nil)
+	resp := httptest.NewRecorder()
+	proc.ServeHTTP(resp, req)
+}
+
 func TestFrameworkRegisteredMessage(t *testing.T) {
 	// setup chanel to receive unmarshalled message
 	eventQ := make(chan interface{})

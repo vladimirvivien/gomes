@@ -2,9 +2,18 @@ package gomes
 
 import (
 	"net"
+	"net/url"
 	"strconv"
 	"strings"
 )
+
+type address string
+func (addr address) AsFullHttpURL(path string) (*url.URL, error){
+	return url.Parse(HTTP_SCHEME + "://" + string(addr) + "/" + path)
+}
+func (addr address) AsHttpURL()(*url.URL, error){
+	return addr.AsFullHttpURL("")
+}
 
 func localIP4String() string {
     addrs, _ := net.InterfaceAddrs()

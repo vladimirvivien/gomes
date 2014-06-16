@@ -4,21 +4,12 @@ import (
 	"net"
 	"fmt"
     "net/http"
-    "net/url"
     "bytes"
     "time"
     _"log"
     mesos "github.com/vladimirvivien/gomes/mesosproto"
     "code.google.com/p/goprotobuf/proto"
 )
-
-type address string
-func (addr address) AsFullHttpURL(path string) (*url.URL, error){
-	return url.Parse(HTTP_SCHEME + "://" + string(addr) + "/" + path)
-}
-func (addr address) AsHttpURL()(*url.URL, error){
-	return addr.AsFullHttpURL("")
-}
 
 type masterClient struct {
 	address address

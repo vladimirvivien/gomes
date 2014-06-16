@@ -42,7 +42,6 @@ type schedulerProcess struct {
 	server *http.Server
 	processId schedProcID
 	eventMsgQ chan<- interface{}
-	controlQ chan int32
 }
 
 // newSchedHttpProcess creates and starts htttp process.
@@ -58,7 +57,6 @@ func newSchedulerProcess (eventQ chan<- interface{}) (*schedulerProcess, error) 
 	proc := &schedulerProcess{
 		server:serv, 
 		eventMsgQ:eventQ,
-		controlQ: make(chan int32),
 	}
 	
 	return proc, nil
@@ -141,7 +139,10 @@ func (proc *schedulerProcess) start() {
 	proc.server.Addr = fmt.Sprintf("%s:%d", localIP4String(), nextTcpPort())
 	proc.processId = newSchedProcID(proc.server.Addr)
 	proc.registerEventHandlers()
-	go proc.server.ListenAndServe()
+	go func(){
+		err := proc.server.ListenAndServe()
+		proc.eventMsgQ <- err
+	}()
 }
 
 // registerEventHandlers Registers http handlers for Mesos master events.

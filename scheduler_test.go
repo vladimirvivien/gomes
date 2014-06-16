@@ -74,7 +74,7 @@ func TestStartDriver(t *testing.T) {
 }
 
 func TestStartDriver_WithNoMasterAvailable(t *testing.T) {
-	driver, err := NewSchedDriver(nil, makeMockFrameworkInfo(),"localhost:5050")
+	driver, err := NewSchedDriver(nil, makeMockFrameworkInfo(),"localhost:50501")
 	if err != nil {
 		t.Fatal ("Error creating SchedulerDriver", err)
 	}
