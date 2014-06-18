@@ -137,6 +137,14 @@ func (sched mockScheduler) ResourceOffers(driver *SchedulerDriver, offers []*mes
 	}
 }
 
+func (sched mockScheduler) OfferRescinded(driver *SchedulerDriver, offerId *mesos.OfferID){
+	log.Println ("mockScheduler.OfferRescinded called...")
+	if offerId.GetValue() != "offer-2"{
+		log.Fatalln("Scheduler.OfferRescinded exepected value not received")
+	}
+}
+
+
 func(sched mockScheduler) Error(driver *SchedulerDriver, err MesosError){
 	log.Println("mockScheduler.Error() called...")
 	log.Println("SchedulerDriver received an error: "+err.Error())
@@ -185,6 +193,19 @@ func TestResourceOffersMessageHandling(t *testing.T) {
 			},
 		},	
 	}
+	driver, err := NewSchedDriver(mockScheduler("Mock"), &mesos.FrameworkInfo{}, "localhost:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	driver.schedMsgQ <- msg	
+}
+
+
+func TestRescindOfferMessageHandling(t *testing.T) {
+	msg := & mesos.RescindResourceOfferMessage {
+		OfferId : &mesos.OfferID{Value: proto.String("offer-2")},
+	}
+
 	driver, err := NewSchedDriver(mockScheduler("Mock"), &mesos.FrameworkInfo{}, "localhost:0")
 	if err != nil {
 		t.Fatal(err)

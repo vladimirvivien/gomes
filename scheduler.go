@@ -20,6 +20,7 @@ type Scheduler interface {
 	Registered(schedDriver *SchedulerDriver, frameworkId *mesos.FrameworkID, masterInfo *mesos.MasterInfo)
 	Reregistered(schedDriver *SchedulerDriver, masterInfo *mesos.MasterInfo)
 	ResourceOffers(schedDriver *SchedulerDriver, offers []*mesos.Offer)
+	OfferRescinded(schedDriver *SchedulerDriver, offerId *mesos.OfferID)
 	Error(schedDriver *SchedulerDriver, err MesosError)
 }
 
@@ -150,6 +151,13 @@ func setupSchedMsgQ(driver *SchedulerDriver){
 			case *mesos.ResourceOffersMessage:
 				if msg, ok := event.(*mesos.ResourceOffersMessage); ok {
 					go sched.ResourceOffers(driver, msg.Offers)
+				}else {
+					go sched.Error(driver, "Failed to cast received Protobuf.Message to mesos.FrameworkRegisteredMessage")
+				}
+
+			case *mesos.RescindResourceOfferMessage:
+				if msg, ok := event.(*mesos.RescindResourceOfferMessage); ok {
+					go sched.OfferRescinded(driver, msg.OfferId)
 				}else {
 					go sched.Error(driver, "Failed to cast received Protobuf.Message to mesos.FrameworkRegisteredMessage")
 				}

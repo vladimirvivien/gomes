@@ -125,7 +125,7 @@ func TestFrameworkReRegisteredMessage(t *testing.T) {
 				t.Fatal("Failed to receive msg of type FrameworkReregisteredMessage")
 			}			
 			if val.MasterInfo.GetId() != "master-1" {
-				t.Fatal("Expected FrameworkRegisteredMessage.Master.Id not found.")
+				t.Fatal("Expected FrameworkRegisteredMessage.Master.Id not found. Got", val)
 			}
 		}
 	}()
@@ -159,7 +159,7 @@ func TestFrameworkReRegisteredMessage(t *testing.T) {
 	}
 }
 
-func TestResourceOffersMessage (t *testing.T) {
+func TestResourceOffersMessage(t *testing.T) {
 	eventQ := make(chan interface{})
 	go func() {
 		for msg := range eventQ{
@@ -203,6 +203,44 @@ func TestResourceOffersMessage (t *testing.T) {
 	if resp.Code != http.StatusAccepted {
 		t.Fatalf("Expecting server status %d but got status %d", http.StatusAccepted, resp.Code)
 	}
+}
+
+func TestRescindOfferMessage(t *testing.T) {
+	eventQ := make(chan interface{})
+	go func() {
+		for msg := range eventQ{
+			val, ok := msg.(*mesos.RescindResourceOfferMessage)
+			if !ok {
+				t.Fatal("Failed to receive msg of type RescindResourceOfferMessage")
+			}
+			if val.OfferId.GetValue() != "offer-2" {
+				t.Fatal("Expected value not found in RescindResourceOfferMessage. See HTTP handler.")
+			} 
+		}
+	}()
+	
+	proc, err := newSchedulerProcess(eventQ)
+	if err != nil {
+		t.Fatal (err)
+	}
+
+	msg := & mesos.RescindResourceOfferMessage {
+		OfferId : &mesos.OfferID{Value: proto.String("offer-2")},
+	}
+	
+	data, err := proto.Marshal(msg)
+	if (err != nil){
+		t.Fatalf("Unable to marshal RescindResourceOfferMessage, %v", err)
+	}
+
+	req := buildHttpRequest(t, "RescindResourceOfferMessage", data)
+	resp := httptest.NewRecorder()
+	
+	proc.ServeHTTP(resp, req)
+	if resp.Code != http.StatusAccepted {
+		t.Fatalf("Expecting server status %d but got status %d", http.StatusAccepted, resp.Code)
+	}
+
 }
 
 func TestSchedHttpProcStart(t *testing.T) {

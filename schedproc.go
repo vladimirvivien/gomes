@@ -95,7 +95,7 @@ func (proc *schedulerProcess) ServeHTTP(rsp http.ResponseWriter, req *http.Reque
 				err = proto.Unmarshal(data, msg)
 				if err != nil {
 					code = http.StatusBadRequest
-					comment = "Error unmashalling FrameworkRegisteredMessage: "+err.Error()
+					comment = fmt.Sprintf("Error unmashalling %s: %s", FRAMEWORK_REGISTERED_EVENT, err.Error())
 				}
 
 			case FRAMEWORK_REREGISTERED_EVENT:
@@ -103,7 +103,7 @@ func (proc *schedulerProcess) ServeHTTP(rsp http.ResponseWriter, req *http.Reque
 				err = proto.Unmarshal(data, msg)
 				if err != nil {
 					code = http.StatusBadRequest
-					comment = "Error unmashalling FrameworkReregisteredMessage: "+err.Error()
+					comment = fmt.Sprintf("Error unmashalling %s: %s",FRAMEWORK_REREGISTERED_EVENT, err.Error())
 				}
 
 			case RESOURCE_OFFERS_EVENT:
@@ -111,7 +111,15 @@ func (proc *schedulerProcess) ServeHTTP(rsp http.ResponseWriter, req *http.Reque
 				err = proto.Unmarshal(data, msg)
 				if err != nil {
 					code = http.StatusBadRequest
-					comment = "Error unmashalling ResourceOffersMessage: "+err.Error()
+					comment = fmt.Sprint("Error unmashalling %s: %s", RESOURCE_OFFERS_EVENT, err.Error())
+				}
+
+			case RESCIND_OFFER_EVENT:
+				msg = new (mesos.RescindResourceOfferMessage)
+				err = proto.Unmarshal(data, msg)
+				if err != nil {
+					code = http.StatusBadRequest
+					comment = fmt.Sprintf("Error unmashalling %s: %s", RESCIND_OFFER_EVENT, err.Error())
 				}
 
 			default:
