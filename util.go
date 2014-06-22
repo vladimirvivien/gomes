@@ -8,22 +8,23 @@ import (
 )
 
 type address string
-func (addr address) AsFullHttpURL(path string) (*url.URL, error){
+
+func (addr address) AsFullHttpURL(path string) (*url.URL, error) {
 	return url.Parse(HTTP_SCHEME + "://" + string(addr) + "/" + path)
 }
-func (addr address) AsHttpURL()(*url.URL, error){
+func (addr address) AsHttpURL() (*url.URL, error) {
 	return addr.AsFullHttpURL("")
 }
 
 func localIP4String() string {
-    addrs, _ := net.InterfaceAddrs()
+	addrs, _ := net.InterfaceAddrs()
 	for _, addr := range addrs {
-		switch addr.(type){
+		switch addr.(type) {
 		case *net.IPNet:
-			ip :=  addr.(*net.IPNet)
-			if!ip.IP.IsLoopback() && ip.IP.To4() != nil {
-		    	return ip.String()[:strings.LastIndex(ip.String(),"/")]
-		    }
+			ip := addr.(*net.IPNet)
+			if !ip.IP.IsLoopback() && ip.IP.To4() != nil {
+				return ip.String()[:strings.LastIndex(ip.String(), "/")]
+			}
 		}
 	}
 	return ""
@@ -32,7 +33,7 @@ func localIP4String() string {
 func nextTcpPort() int {
 	l, err := net.Listen("tcp4", ":0")
 	defer l.Close()
-	addr :=  l.Addr().String()
+	addr := l.Addr().String()
 	port, err := strconv.Atoi(addr[strings.LastIndex(addr, ":")+1:])
 	if err != nil {
 		return 0
