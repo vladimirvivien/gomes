@@ -134,52 +134,21 @@ func (driver *SchedulerDriver) Run() mesos.Status {
 func setupSchedMsgQ(driver *SchedulerDriver) {
 	sched := driver.Scheduler
 	for event := range driver.schedMsgQ {
-		switch event.(type) {
+		switch msg := event.(type) {
 		case *mesos.FrameworkRegisteredMessage:
-			if msg, ok := event.(*mesos.FrameworkRegisteredMessage); ok {
-				go sched.Registered(driver, msg.FrameworkId, msg.MasterInfo)
-			} else {
-				go sched.Error(driver, "Failed to cast received Protobuf.Message to mesos.FrameworkRegisteredMessage")
-			}
-
+			go sched.Registered(driver, msg.FrameworkId, msg.MasterInfo)
 		case *mesos.FrameworkReregisteredMessage:
-			if msg, ok := event.(*mesos.FrameworkReregisteredMessage); ok {
-				go sched.Reregistered(driver, msg.MasterInfo)
-			} else {
-				go sched.Error(driver, "Failed to cast received Protobuf.Message to mesos.FrameworkReregisteredMessage")
-			}
-
+			go sched.Reregistered(driver, msg.MasterInfo)
 		case *mesos.ResourceOffersMessage:
-			if msg, ok := event.(*mesos.ResourceOffersMessage); ok {
-				go sched.ResourceOffers(driver, msg.Offers)
-			} else {
-				go sched.Error(driver, "Failed to cast received Protobuf.Message to mesos.ResourceOffersMessage")
-			}
-
+			go sched.ResourceOffers(driver, msg.Offers)
 		case *mesos.RescindResourceOfferMessage:
-			if msg, ok := event.(*mesos.RescindResourceOfferMessage); ok {
-				go sched.OfferRescinded(driver, msg.OfferId)
-			} else {
-				go sched.Error(driver, "Failed to cast received Protobuf.Message to mesos.RescindResourceOfferMessage")
-			}
-
+			go sched.OfferRescinded(driver, msg.OfferId)
 		case *mesos.StatusUpdateMessage:
-			if msg, ok := event.(*mesos.StatusUpdateMessage); ok {
-				go sched.StatusUpdate(driver, msg.Update.Status)
-			} else {
-				go sched.Error(driver, "Failed to cast received Protobuf.Message to mesos.StatusUpdate")
-			}
-
+			go sched.StatusUpdate(driver, msg.Update.Status)
 		case MesosError:
-			err := event.(MesosError)
-			sched.Error(driver, err)
-
-		case error:
-			err := event.(error)
-			sched.Error(driver, NewMesosError(err.Error()))
-
+			sched.Error(driver, msg)
 		default:
-			sched.Error(driver, "Received unexpected event from server.")
+			sched.Error(driver, MesosError("Received unexpected event from server."))
 		}
 	}
 }

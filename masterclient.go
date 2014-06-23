@@ -67,7 +67,3 @@ func (client *masterClient) send(from schedProcID, reqPath string, msg proto.Mes
 func buildReqPath(message string) string {
 	return "/" + HTTP_MASTER_PREFIX + "/" + MESOS_INTERNAL_PREFIX + message
 }
-
-// a generic send function. Will build message path based on msg type.
-// func (client *masterClient) send(msg proto.ProtoMessage) (error) {
-// }
