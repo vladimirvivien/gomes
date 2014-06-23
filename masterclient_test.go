@@ -2,7 +2,6 @@ package gomes
 
 import (
 	"code.google.com/p/goprotobuf/proto"
-	_ "fmt"
 	mesos "github.com/vladimirvivien/gomes/mesosproto"
 	"io/ioutil"
 	"log"

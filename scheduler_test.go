@@ -1,7 +1,7 @@
 package gomes
 
 import (
-	proto "code.google.com/p/goprotobuf/proto"
+	"code.google.com/p/goprotobuf/proto"
 	mesos "github.com/vladimirvivien/gomes/mesosproto"
 	"log"
 	"net/http"

@@ -294,6 +294,7 @@ func TestStatusUpdateMessage(t *testing.T) {
 	resp := httptest.NewRecorder()
 
 	proc.ServeHTTP(resp, req)
+
 	if resp.Code != http.StatusAccepted {
 		t.Fatalf("Expecting server status %d but got status %d", http.StatusAccepted, resp.Code)
 	}
