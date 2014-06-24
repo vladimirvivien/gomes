@@ -300,6 +300,50 @@ func TestStatusUpdateMessage(t *testing.T) {
 	}
 }
 
+func TestFrameworkMessage(t *testing.T) {
+	eventQ := make(chan interface{})
+	go func() {
+		for msg := range eventQ {
+			val, ok := msg.(*mesos.ExecutorToFrameworkMessage)
+			if !ok {
+				t.Fatal("Failed to receive msg of type ExecutorToFrameworkMessage")
+			}
+			if val.SlaveId.GetValue() != "test-slave-1" {
+				t.Fatal("ExecutorToFrameworkMessage.SlaveId not received.")
+			}
+			if string(val.GetData()) != "Hello-Test" {
+				t.Fatal("ExecutorToFrameworkMessage.Data not received.")
+			}
+		}
+	}()
+
+	proc, err := newSchedulerProcess(eventQ)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	msg := &mesos.ExecutorToFrameworkMessage{
+		SlaveId:     &mesos.SlaveID{Value: proto.String("test-slave-1")},
+		FrameworkId: &mesos.FrameworkID{Value: proto.String("test-framework-1")},
+		ExecutorId:  &mesos.ExecutorID{Value: proto.String("test-executor-")},
+		Data:        []byte("Hello-Test"),
+	}
+
+	data, err := proto.Marshal(msg)
+	if err != nil {
+		t.Fatalf("Unable to marshal ExecutorToFrameworkMessage, %v", err)
+	}
+
+	req := buildHttpRequest(t, "ExecutorToFrameworkMessage", data)
+	resp := httptest.NewRecorder()
+
+	proc.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusAccepted {
+		t.Fatalf("Expecting server status %d but got status %d", http.StatusAccepted, resp.Code)
+	}
+}
+
 func TestSchedHttpProcStart(t *testing.T) {
 	proc, err := newSchedulerProcess(make(chan interface{}))
 	if err != nil {

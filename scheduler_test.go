@@ -157,6 +157,21 @@ func (sched mockScheduler) StatusUpdate(schedDriver *SchedulerDriver, taskStatus
 	}
 }
 
+func (sched mockScheduler) FrameworkMessage(schedDriver *SchedulerDriver, execId *mesos.ExecutorID, slaveId *mesos.SlaveID, data []byte) {
+	log.Println("mockScheduler.FrameworkMessage called...")
+	if execId.GetValue() != "test-executor-1" {
+		log.Fatal("Scheduler.FrameworkMessage.ExecutorId not received.")
+	}
+
+	if slaveId.GetValue() != "test-slave-1" {
+		log.Fatal("Scheduler.FrameworkMessage.SlaveId not received.")
+	}
+
+	if string(data) != "Hello-Test" {
+		log.Fatal("Scheduler.FrameworkMessage.Data not received.")
+	}
+}
+
 func (sched mockScheduler) Error(driver *SchedulerDriver, err MesosError) {
 	log.Println("mockScheduler.Error() called...")
 	log.Println("SchedulerDriver received an error: " + err.Error())
@@ -244,6 +259,21 @@ func TestStatusUpdateMessageHandling(t *testing.T) {
 		t.Fatal(err)
 	}
 	driver.schedMsgQ <- msg
+}
+
+func TestFrameworkMessageHandling(t *testing.T) {
+	msg := &mesos.ExecutorToFrameworkMessage{
+		SlaveId:     &mesos.SlaveID{Value: proto.String("test-slave-1")},
+		FrameworkId: &mesos.FrameworkID{Value: proto.String("test-framework-1")},
+		ExecutorId:  &mesos.ExecutorID{Value: proto.String("test-executor-1")},
+		Data:        []byte("Hello-Test"),
+	}
+	driver, err := NewSchedDriver(mockScheduler("Mock"), &mesos.FrameworkInfo{}, "localhost:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	driver.schedMsgQ <- msg
+
 }
 
 func TestErrorMessageHandling(t *testing.T) {

@@ -154,6 +154,9 @@ func (proc *schedulerProcess) registerEventHandlers() {
 	http.Handle(makeProcEventPath(proc, FRAMEWORK_REGISTERED_EVENT), proc)
 	http.Handle(makeProcEventPath(proc, FRAMEWORK_REREGISTERED_EVENT), proc)
 	http.Handle(makeProcEventPath(proc, RESOURCE_OFFERS_EVENT), proc)
+	http.Handle(makeProcEventPath(proc, RESCIND_OFFER_EVENT), proc)
+	http.Handle(makeProcEventPath(proc, STATUS_UPDATE_EVENT), proc)
+	http.Handle(makeProcEventPath(proc, FRAMEWORK_MESSAGE_EVENT), proc)
 }
 
 func makeProcEventPath(proc *schedulerProcess, eventName string) string {
