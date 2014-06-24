@@ -96,51 +96,39 @@ func (proc *schedulerProcess) ServeHTTP(rsp http.ResponseWriter, req *http.Reque
 		case FRAMEWORK_REGISTERED_EVENT:
 			msg = new(mesos.FrameworkRegisteredMessage)
 			err = proto.Unmarshal(data, msg)
-			if err != nil {
-				code = http.StatusBadRequest
-				comment = fmt.Sprintf("Error unmashalling %s: %s", FRAMEWORK_REGISTERED_EVENT, err.Error())
-			}
 
 		case FRAMEWORK_REREGISTERED_EVENT:
 			msg = new(mesos.FrameworkReregisteredMessage)
 			err = proto.Unmarshal(data, msg)
-			if err != nil {
-				code = http.StatusBadRequest
-				comment = fmt.Sprintf("Error unmashalling %s: %s", FRAMEWORK_REREGISTERED_EVENT, err.Error())
-			}
 
 		case RESOURCE_OFFERS_EVENT:
 			msg = new(mesos.ResourceOffersMessage)
 			err = proto.Unmarshal(data, msg)
-			if err != nil {
-				code = http.StatusBadRequest
-				comment = fmt.Sprint("Error unmashalling %s: %s", RESOURCE_OFFERS_EVENT, err.Error())
-			}
 
 		case RESCIND_OFFER_EVENT:
 			msg = new(mesos.RescindResourceOfferMessage)
 			err = proto.Unmarshal(data, msg)
-			if err != nil {
-				code = http.StatusBadRequest
-				comment = fmt.Sprintf("Error unmashalling %s: %s", RESCIND_OFFER_EVENT, err.Error())
-			}
+
 		case STATUS_UPDATE_EVENT:
 			msg = new(mesos.StatusUpdateMessage)
 			err = proto.Unmarshal(data, msg)
-			if err != nil {
-				code = http.StatusBadRequest
-				comment = fmt.Sprintf("Error unmashalling %s: %s", STATUS_UPDATE_EVENT, err.Error())
-			}
+
+		case FRAMEWORK_MESSAGE_EVENT:
+			msg = new(mesos.ExecutorToFrameworkMessage)
+			err = proto.Unmarshal(data, msg)
+
 		default:
-			err = fmt.Errorf("Unable to parse event from master")
+			err = fmt.Errorf("Unable to parse event from master: %s unrecognized.", messageType)
 			code = http.StatusBadRequest
-			comment = err.Error() + ": " + messageType + " unrecognized."
+			comment = err.Error()
 		}
 
-		if err == nil && code == http.StatusAccepted {
-			proc.eventMsgQ <- msg
-		} else {
+		if err != nil {
+			code = http.StatusBadRequest
+			comment = fmt.Sprintf("Error unmashalling %s: %s", messageType, err.Error())
 			proc.eventMsgQ <- NewMesosError(comment)
+		} else {
+			proc.eventMsgQ <- msg
 		}
 	}
 

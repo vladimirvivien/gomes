@@ -22,4 +22,5 @@ const (
 	RESOURCE_OFFERS_EVENT        = "ResourceOffersMessage"
 	RESCIND_OFFER_EVENT          = "RescindResourceOfferMessage"
 	STATUS_UPDATE_EVENT          = "StatusUpdateMessage"
+	FRAMEWORK_MESSAGE_EVENT      = "ExecutorToFrameworkMessage"
 )
