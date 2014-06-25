@@ -23,4 +23,5 @@ const (
 	RESCIND_OFFER_EVENT          = "RescindResourceOfferMessage"
 	STATUS_UPDATE_EVENT          = "StatusUpdateMessage"
 	FRAMEWORK_MESSAGE_EVENT      = "ExecutorToFrameworkMessage"
+	LOST_SLAVE_EVENT             = "LostSlaveMessage"
 )

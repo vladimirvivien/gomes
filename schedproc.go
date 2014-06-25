@@ -117,6 +117,10 @@ func (proc *schedulerProcess) ServeHTTP(rsp http.ResponseWriter, req *http.Reque
 			msg = new(mesos.ExecutorToFrameworkMessage)
 			err = proto.Unmarshal(data, msg)
 
+		case LOST_SLAVE_EVENT:
+			msg = new(mesos.LostSlaveMessage)
+			err = proto.Unmarshal(data, msg)
+
 		default:
 			err = fmt.Errorf("Unable to parse event from master: %s unrecognized.", messageType)
 			code = http.StatusBadRequest
@@ -157,6 +161,7 @@ func (proc *schedulerProcess) registerEventHandlers() {
 	http.Handle(makeProcEventPath(proc, RESCIND_OFFER_EVENT), proc)
 	http.Handle(makeProcEventPath(proc, STATUS_UPDATE_EVENT), proc)
 	http.Handle(makeProcEventPath(proc, FRAMEWORK_MESSAGE_EVENT), proc)
+	http.Handle(makeProcEventPath(proc, LOST_SLAVE_EVENT), proc)
 }
 
 func makeProcEventPath(proc *schedulerProcess, eventName string) string {

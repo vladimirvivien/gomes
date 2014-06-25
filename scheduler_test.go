@@ -172,6 +172,13 @@ func (sched mockScheduler) FrameworkMessage(schedDriver *SchedulerDriver, execId
 	}
 }
 
+func (sched mockScheduler) SlaveLost(driver *SchedulerDriver, slaveId *mesos.SlaveID) {
+	log.Println("mockScheduler.SlaveLost called...")
+	if slaveId.GetValue() != "test-slave-1" {
+		log.Fatal("Scheduler.SlaveLost.SlaveID not received.")
+	}
+}
+
 func (sched mockScheduler) Error(driver *SchedulerDriver, err MesosError) {
 	log.Println("mockScheduler.Error() called...")
 	log.Println("SchedulerDriver received an error: " + err.Error())
@@ -274,6 +281,16 @@ func TestFrameworkMessageHandling(t *testing.T) {
 	}
 	driver.schedMsgQ <- msg
 
+}
+
+func TestSlaveLostMessageHandling(t *testing.T) {
+	msg := &mesos.LostSlaveMessage{SlaveId: &mesos.SlaveID{Value: proto.String("test-slave-1")}}
+
+	driver, err := NewSchedDriver(mockScheduler("Mock"), &mesos.FrameworkInfo{}, "localhost:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	driver.schedMsgQ <- msg
 }
 
 func TestErrorMessageHandling(t *testing.T) {

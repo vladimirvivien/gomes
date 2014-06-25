@@ -24,6 +24,7 @@ type Scheduler interface {
 	OfferRescinded(schedDriver *SchedulerDriver, offerId *mesos.OfferID)
 	StatusUpdate(schedDriver *SchedulerDriver, taskStatus *mesos.TaskStatus)
 	FrameworkMessage(schedDriver *SchedulerDriver, execId *mesos.ExecutorID, slaveId *mesos.SlaveID, data []byte)
+	SlaveLost(schedDriver *SchedulerDriver, slaveId *mesos.SlaveID)
 	Error(schedDriver *SchedulerDriver, err MesosError)
 }
 
@@ -148,6 +149,8 @@ func setupSchedMsgQ(driver *SchedulerDriver) {
 			go sched.StatusUpdate(driver, msg.Update.Status)
 		case *mesos.ExecutorToFrameworkMessage:
 			go sched.FrameworkMessage(driver, msg.ExecutorId, msg.SlaveId, msg.Data)
+		case *mesos.LostSlaveMessage:
+			go sched.SlaveLost(driver, msg.SlaveId)
 		case MesosError:
 			sched.Error(driver, msg)
 		default:

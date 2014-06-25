@@ -344,6 +344,43 @@ func TestFrameworkMessage(t *testing.T) {
 	}
 }
 
+func TestLostSlaveMessage(t *testing.T) {
+	eventQ := make(chan interface{})
+	go func() {
+		for msg := range eventQ {
+			val, ok := msg.(*mesos.LostSlaveMessage)
+			if !ok {
+				t.Fatal("Failed to receive msg of type ExecutorToFrameworkMessage")
+			}
+			if val.SlaveId.GetValue() != "test-slave-1" {
+				t.Fatal("LostSlaveMessage.SlaveId not received.")
+			}
+		}
+	}()
+
+	proc, err := newSchedulerProcess(eventQ)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	msg := &mesos.LostSlaveMessage{SlaveId: &mesos.SlaveID{Value: proto.String("test-slave-1")}}
+
+	data, err := proto.Marshal(msg)
+	if err != nil {
+		t.Fatalf("Unable to marshal LostSlaveMessage, %v", err)
+	}
+
+	req := buildHttpRequest(t, LOST_SLAVE_EVENT, data)
+	resp := httptest.NewRecorder()
+
+	proc.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusAccepted {
+		t.Fatalf("Expecting server status %d but got status %d", http.StatusAccepted, resp.Code)
+	}
+
+}
+
 func TestSchedHttpProcStart(t *testing.T) {
 	proc, err := newSchedulerProcess(make(chan interface{}))
 	if err != nil {
@@ -365,7 +402,6 @@ func TestSchedHttpProcStart(t *testing.T) {
 	if !idreg.MatchString(proc.processId.value) {
 		t.Fatalf("ID value malformed. Got [%s]", proc.processId.value)
 	}
-
 }
 
 func buildHttpRequest(t *testing.T, msgName string, data []byte) *http.Request {
