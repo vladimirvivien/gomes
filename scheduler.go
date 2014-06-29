@@ -4,6 +4,7 @@ import (
 	proto "code.google.com/p/goprotobuf/proto"
 	"fmt"
 	mesos "github.com/vladimirvivien/gomes/mesosproto"
+	"log"
 	"os"
 	"os/user"
 )
@@ -32,8 +33,8 @@ type SchedulerDriver struct {
 	Master        string
 	Scheduler     Scheduler
 	FrameworkInfo *mesos.FrameworkInfo
+	Status        mesos.Status
 
-	status       mesos.Status
 	masterClient *masterClient
 	schedMsgQ    chan interface{}
 	controlQ     chan mesos.Status
@@ -87,50 +88,57 @@ func NewSchedDriver(scheduler Scheduler, framework *mesos.FrameworkInfo, master 
 
 	driver.masterClient = newMasterClient(master)
 
-	driver.status = mesos.Status_DRIVER_NOT_STARTED
+	driver.Status = mesos.Status_DRIVER_NOT_STARTED
 
 	return driver, nil
 }
 
 func (driver *SchedulerDriver) Start() mesos.Status {
-	if driver.status != mesos.Status_DRIVER_NOT_STARTED {
-		return driver.status
+	if driver.Status != mesos.Status_DRIVER_NOT_STARTED {
+		return driver.Status
 	}
-	driver.schedProc.start()
+	err := driver.schedProc.start()
+	if err != nil {
+		driver.Status = mesos.Status_DRIVER_NOT_STARTED
+		driver.schedMsgQ <- err
+		return driver.Status
+	}
 
 	// TODO: should ping scheduler process here to make sure
 	// http process is up and running with no issue.
-	err := driver.masterClient.RegisterFramework(driver.schedProc.processId, driver.FrameworkInfo)
+	err = driver.masterClient.RegisterFramework(driver.schedProc.processId, driver.FrameworkInfo)
 	if err != nil {
-		driver.status = mesos.Status_DRIVER_NOT_STARTED
+		driver.Status = mesos.Status_DRIVER_NOT_STARTED
 		if driver.Scheduler != nil {
 			driver.Scheduler.Error(driver, MesosError("Failed to register the framework:"+err.Error()))
 		}
 	} else {
-		driver.status = mesos.Status_DRIVER_RUNNING
+		driver.Status = mesos.Status_DRIVER_RUNNING
 	}
-	return driver.status
+	return driver.Status
 }
 
 func (driver *SchedulerDriver) Join() mesos.Status {
-	if driver.status != mesos.Status_DRIVER_RUNNING {
-		return driver.status
+	if driver.Status != mesos.Status_DRIVER_RUNNING {
+		return driver.Status
 	}
-
 	return <-driver.controlQ
 }
 
 func (driver *SchedulerDriver) Run() mesos.Status {
-	go func() {
-		stat := driver.Start()
-		driver.controlQ <- stat
-	}()
-	stat := <-driver.controlQ
-
-	if stat != mesos.Status_DRIVER_RUNNING {
-		return stat
+	driver.Status = driver.Start()
+	if driver.Status != mesos.Status_DRIVER_RUNNING {
+		return driver.Status
 	}
 	return driver.Join()
+}
+
+func (driver *SchedulerDriver) Stop(failover bool) {
+	log.Printf("Stopping framework %s", driver.FrameworkInfo.GetId().GetValue())
+	//driver.schedProc.server.
+	driver.Status = mesos.Status_DRIVER_STOPPED
+
+	// unregister framework from master
 }
 
 func setupSchedMsgQ(driver *SchedulerDriver) {

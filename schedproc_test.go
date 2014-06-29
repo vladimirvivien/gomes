@@ -48,6 +48,29 @@ func TestSchedProcCreation(t *testing.T) {
 	}
 }
 
+func TestSchedProcStart(t *testing.T) {
+	eventQ := make(chan interface{})
+	go func() {
+		msg := <-eventQ
+		if val, ok := msg.(error); ok {
+			t.Fatalf("Error when starting: %s", val.Error())
+		} else {
+			log.Println("Scheduler Process started OK")
+		}
+	}()
+
+	proc, err := newSchedulerProcess(eventQ)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	eventQ <- proc.start()
+}
+
+func TestSchedProcStop(t *testing.T) {
+
+}
+
 func TestScheProcError(t *testing.T) {
 	eventQ := make(chan interface{})
 	go func() {
@@ -379,29 +402,6 @@ func TestLostSlaveMessage(t *testing.T) {
 		t.Fatalf("Expecting server status %d but got status %d", http.StatusAccepted, resp.Code)
 	}
 
-}
-
-func TestSchedHttpProcStart(t *testing.T) {
-	proc, err := newSchedulerProcess(make(chan interface{}))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ctrlQ := make(chan int)
-	go func() {
-		proc.start()
-		log.Println("Started Scheduler Process:", proc.server.Addr)
-		ctrlQ <- 1
-	}()
-	<-ctrlQ
-
-	// send test FrameworkRegistered messsage
-
-	log.Println("Scheduler Process started, ID =", proc.processId.value)
-	idreg := regexp.MustCompile(`^[a-z]+\(\d+\)@.*$`)
-	if !idreg.MatchString(proc.processId.value) {
-		t.Fatalf("ID value malformed. Got [%s]", proc.processId.value)
-	}
 }
 
 func buildHttpRequest(t *testing.T, msgName string, data []byte) *http.Request {

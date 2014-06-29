@@ -5,6 +5,7 @@ import (
 	"fmt"
 	mesos "github.com/vladimirvivien/gomes/mesosproto"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/url"
 	"path"
@@ -40,6 +41,7 @@ SchedHttpProcess manages http requests from the connected master.
 It wraps the standard Http Server.
 */
 type schedulerProcess struct {
+	listener  net.Listener
 	server    *http.Server
 	processId schedProcID
 	eventMsgQ chan<- interface{}
@@ -53,7 +55,10 @@ func newSchedulerProcess(eventQ chan<- interface{}) (*schedulerProcess, error) {
 	}
 
 	serv := &http.Server{
-		Addr: ":0",
+	//Addr: ":0",
+	//ReadTimeout:nil,
+	//WriteTimeout:
+	//ConnState : nil,
 	}
 
 	proc := &schedulerProcess{
@@ -63,6 +68,44 @@ func newSchedulerProcess(eventQ chan<- interface{}) (*schedulerProcess, error) {
 	}
 
 	return proc, nil
+}
+
+// start Starts the internal http process to listen to incoming events from Master.
+func (proc *schedulerProcess) start() error {
+	addr := fmt.Sprintf("%s:%d", localIP4String(), nextTcpPort())
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		proc.eventMsgQ <- err
+		return err
+	}
+	proc.listener = listener
+	proc.processId = newSchedProcID(proc.server.Addr)
+	proc.registerEventHandlers()
+	go func(lis net.Listener) {
+		err := proc.server.Serve(lis)
+		proc.eventMsgQ <- err
+	}(proc.listener)
+
+	return nil
+}
+
+// stop Stops the Scheduler process and internal server.
+func (proc *schedulerProcess) stop() {
+	err := proc.listener.Close()
+	if err != nil {
+		proc.eventMsgQ <- err
+	}
+}
+
+// registerEventHandlers Registers http handlers for Mesos master events.
+func (proc *schedulerProcess) registerEventHandlers() {
+	http.Handle(makeProcEventPath(proc, FRAMEWORK_REGISTERED_EVENT), proc)
+	http.Handle(makeProcEventPath(proc, FRAMEWORK_REREGISTERED_EVENT), proc)
+	http.Handle(makeProcEventPath(proc, RESOURCE_OFFERS_EVENT), proc)
+	http.Handle(makeProcEventPath(proc, RESCIND_OFFER_EVENT), proc)
+	http.Handle(makeProcEventPath(proc, STATUS_UPDATE_EVENT), proc)
+	http.Handle(makeProcEventPath(proc, FRAMEWORK_MESSAGE_EVENT), proc)
+	http.Handle(makeProcEventPath(proc, LOST_SLAVE_EVENT), proc)
 }
 
 func (proc *schedulerProcess) ServeHTTP(rsp http.ResponseWriter, req *http.Request) {
@@ -140,28 +183,6 @@ func (proc *schedulerProcess) ServeHTTP(rsp http.ResponseWriter, req *http.Reque
 	if comment != "" {
 		fmt.Fprintln(rsp, comment)
 	}
-}
-
-// start Starts the internal http process to listen to incoming events from Master.
-func (proc *schedulerProcess) start() {
-	proc.server.Addr = fmt.Sprintf("%s:%d", localIP4String(), nextTcpPort())
-	proc.processId = newSchedProcID(proc.server.Addr)
-	proc.registerEventHandlers()
-	go func() {
-		err := proc.server.ListenAndServe()
-		proc.eventMsgQ <- err
-	}()
-}
-
-// registerEventHandlers Registers http handlers for Mesos master events.
-func (proc *schedulerProcess) registerEventHandlers() {
-	http.Handle(makeProcEventPath(proc, FRAMEWORK_REGISTERED_EVENT), proc)
-	http.Handle(makeProcEventPath(proc, FRAMEWORK_REREGISTERED_EVENT), proc)
-	http.Handle(makeProcEventPath(proc, RESOURCE_OFFERS_EVENT), proc)
-	http.Handle(makeProcEventPath(proc, RESCIND_OFFER_EVENT), proc)
-	http.Handle(makeProcEventPath(proc, STATUS_UPDATE_EVENT), proc)
-	http.Handle(makeProcEventPath(proc, FRAMEWORK_MESSAGE_EVENT), proc)
-	http.Handle(makeProcEventPath(proc, LOST_SLAVE_EVENT), proc)
 }
 
 func makeProcEventPath(proc *schedulerProcess, eventName string) string {
