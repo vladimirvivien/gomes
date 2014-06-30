@@ -133,12 +133,22 @@ func (driver *SchedulerDriver) Run() mesos.Status {
 	return driver.Join()
 }
 
-func (driver *SchedulerDriver) Stop(failover bool) {
+func (driver *SchedulerDriver) Stop(failover bool) mesos.Status {
 	log.Printf("Stopping framework %s", driver.FrameworkInfo.GetId().GetValue())
-	//driver.schedProc.server.
-	driver.Status = mesos.Status_DRIVER_STOPPED
+	if driver.Status != mesos.Status_DRIVER_RUNNING && driver.Status != mesos.Status_DRIVER_ABORTED {
+		return driver.Status
+	}
+	err := driver.schedProc.stop()
+	if err != nil {
+		driver.schedMsgQ <- err
+	}
 
-	// unregister framework from master
+	if driver.masterClient.connected && !failover {
+		// send UnregisterFrameworkMessage to master.
+	}
+
+	driver.Status = mesos.Status_DRIVER_STOPPED
+	return driver.Status
 }
 
 func setupSchedMsgQ(driver *SchedulerDriver) {

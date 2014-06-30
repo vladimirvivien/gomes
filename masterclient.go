@@ -13,6 +13,7 @@ import (
 type masterClient struct {
 	address    address
 	httpClient http.Client
+	connected  bool
 }
 
 func newMasterClient(master string) *masterClient {

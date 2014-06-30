@@ -75,7 +75,6 @@ func (proc *schedulerProcess) start() error {
 	addr := fmt.Sprintf("%s:%d", localIP4String(), nextTcpPort())
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
-		proc.eventMsgQ <- err
 		return err
 	}
 	proc.listener = listener
@@ -90,11 +89,16 @@ func (proc *schedulerProcess) start() error {
 }
 
 // stop Stops the Scheduler process and internal server.
-func (proc *schedulerProcess) stop() {
+func (proc *schedulerProcess) stop() error {
+	//TODO Needs to be done way better than this.
 	err := proc.listener.Close()
 	if err != nil {
-		proc.eventMsgQ <- err
+		if _, ok := err.(*net.OpError); ok {
+			return nil // ignore error caused by closing listener (for now)
+		}
+		return err
 	}
+	return nil
 }
 
 // registerEventHandlers Registers http handlers for Mesos master events.

@@ -50,12 +50,35 @@ func TestSchedProcCreation(t *testing.T) {
 
 func TestSchedProcStart(t *testing.T) {
 	eventQ := make(chan interface{})
+	ctlrQ := make(chan int)
 	go func() {
 		msg := <-eventQ
 		if val, ok := msg.(error); ok {
 			t.Fatalf("Error when starting: %s", val.Error())
-		} else {
-			log.Println("Scheduler Process started OK")
+		}
+		ctlrQ <- 1
+	}()
+
+	proc, err := newSchedulerProcess(eventQ)
+	if err != nil {
+		t.Fatal(err)
+	}
+	eventQ <- proc.start()
+	<-ctlrQ
+}
+
+func TestSchedProcStop(t *testing.T) {
+	eventQ := make(chan interface{})
+	ctlrQ := make(chan int)
+	go func() {
+		for msg := range eventQ {
+			switch msg := msg.(type) {
+			case error:
+				t.Fatalf("Error stopping schedproc: %s", msg.Error())
+				ctlrQ <- 1
+			default:
+				ctlrQ <- 1
+			}
 		}
 	}()
 
@@ -63,12 +86,14 @@ func TestSchedProcStart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	eventQ <- proc.start()
-}
-
-func TestSchedProcStop(t *testing.T) {
-
+	<-ctlrQ
+	log.Print("Started proc server on", proc.server.Addr, "\n")
+	// stop proc
+	err = proc.stop()
+	log.Println(err)
+	//eventQ <- err
+	//<-ctlrQ
 }
 
 func TestScheProcError(t *testing.T) {
