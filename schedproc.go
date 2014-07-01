@@ -78,11 +78,16 @@ func (proc *schedulerProcess) start() error {
 		return err
 	}
 	proc.listener = listener
-	proc.processId = newSchedProcID(proc.server.Addr)
+	proc.processId = newSchedProcID(addr)
 	proc.registerEventHandlers()
 	go func(lis net.Listener) {
 		err := proc.server.Serve(lis)
-		proc.eventMsgQ <- err
+		// TODO hack: if error.Op = 'accept' assume connection got closed
+		//      and server.listener stopped blocking on accept.
+		val, ok := err.(*net.OpError)
+		if !ok || val.Op != "accept" {
+			proc.eventMsgQ <- err
+		}
 	}(proc.listener)
 
 	return nil
@@ -90,7 +95,7 @@ func (proc *schedulerProcess) start() error {
 
 // stop Stops the Scheduler process and internal server.
 func (proc *schedulerProcess) stop() error {
-	//TODO Needs to be done way better than this.
+	//TODO Needs a better way than this.
 	err := proc.listener.Close()
 	if err != nil {
 		if _, ok := err.(*net.OpError); ok {

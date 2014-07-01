@@ -5,6 +5,7 @@ import (
 	"code.google.com/p/goprotobuf/proto"
 	mesos "github.com/vladimirvivien/gomes/mesosproto"
 	"log"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
@@ -50,35 +51,43 @@ func TestSchedProcCreation(t *testing.T) {
 
 func TestSchedProcStart(t *testing.T) {
 	eventQ := make(chan interface{})
-	ctlrQ := make(chan int)
 	go func() {
 		msg := <-eventQ
 		if val, ok := msg.(error); ok {
-			t.Fatalf("Error when starting: %s", val.Error())
+			t.Fatalf("TestSchedProcStart() - got error: %s", val.Error())
 		}
-		ctlrQ <- 1
 	}()
 
 	proc, err := newSchedulerProcess(eventQ)
 	if err != nil {
 		t.Fatal(err)
 	}
-	eventQ <- proc.start()
-	<-ctlrQ
+
+	http.HandleFunc("/test", func(rsp http.ResponseWriter, req *http.Request) {
+		rsp.WriteHeader(http.StatusAccepted)
+	})
+
+	err = proc.start()
+	if err != nil {
+		t.Fatalf("Error starting SchedProc %s", err)
+	}
+
+	rsp, err := http.Get("http://" + proc.listener.Addr().String() + "/test")
+	if err != nil {
+		t.Fatal("Error while verifying SchedProc.Server:", err)
+	}
+	if rsp.StatusCode != http.StatusAccepted {
+		t.Log("Did not receive expected status from SchedProc /test path.")
+	}
 }
 
 func TestSchedProcStop(t *testing.T) {
 	eventQ := make(chan interface{})
-	ctlrQ := make(chan int)
 	go func() {
-		for msg := range eventQ {
-			switch msg := msg.(type) {
-			case error:
-				t.Fatalf("Error stopping schedproc: %s", msg.Error())
-				ctlrQ <- 1
-			default:
-				ctlrQ <- 1
-			}
+		msg := <-eventQ
+		if val, ok := msg.(*net.OpError); ok {
+
+			t.Fatalf("TestSchedProcStop() - got : %s", val.Op)
 		}
 	}()
 
@@ -86,14 +95,24 @@ func TestSchedProcStop(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	eventQ <- proc.start()
-	<-ctlrQ
-	log.Print("Started proc server on", proc.server.Addr, "\n")
-	// stop proc
+
+	err = proc.start()
+	if err != nil {
+		t.Fatalf("Error starting sched proc: %s", err.Error())
+	}
+	_, err = http.Get("http://" + proc.listener.Addr().String())
+	if err != nil {
+		t.Fatal("SchedProc.Server validation error:", err)
+	}
+
 	err = proc.stop()
-	log.Println(err)
-	//eventQ <- err
-	//<-ctlrQ
+	if err != nil {
+		t.Fatal("Error stopping sched proc:", err)
+	}
+	_, err = http.Get("http://" + proc.listener.Addr().String())
+	if err == nil {
+		t.Fatal("SchedProc.Server - expected no connection, but connected OK.")
+	}
 }
 
 func TestScheProcError(t *testing.T) {
