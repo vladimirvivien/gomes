@@ -234,21 +234,26 @@ func setupSchedMsgQ(driver *SchedulerDriver) {
 
 		case MesosError:
 			go func() {
-				if driver.Status == mesos.Status_DRIVER_ABORTED {
-					log.Println("Ignoring error because driver is aborted.")
-					return
-				}
-				// TODO call driver.Abort()
-				if sched != nil {
-					sched.Error(driver, msg)
-				}
+				driver.handleDriverError(msg)
 			}()
 		default:
 			go func() {
-				if sched != nil {
-					sched.Error(driver, NewMesosError("Driver received unexpected event."))
-				}
+				err := NewMesosError("Driver received unexpected event.")
+				driver.handleDriverError(err)
 			}()
+		}
+	}
+}
+
+func (driver *SchedulerDriver) handleDriverError(err MesosError) {
+	if driver.Status == mesos.Status_DRIVER_ABORTED {
+		log.Println("Ignoring error because driver is aborted.")
+		return
+	}
+	stat := driver.Abort()
+	if stat == mesos.Status_DRIVER_ABORTED {
+		if driver.Scheduler != nil {
+			driver.Scheduler.Error(driver, err)
 		}
 	}
 }
