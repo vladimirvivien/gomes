@@ -158,6 +158,11 @@ func TestFrameworkRegisteredMessage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	proc.started = true
+	proc.aborted = false
+	if err != nil {
+		t.Fatal("Unable to start Scheduler Process.	")
+	}
 	msg := &mesos.FrameworkRegisteredMessage{
 		FrameworkId: &mesos.FrameworkID{Value: proto.String("test-framework-1")},
 		MasterInfo: &mesos.MasterInfo{
@@ -202,6 +207,9 @@ func TestFrameworkReRegisteredMessage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	proc.started = true
+	proc.aborted = false
+
 	msg := &mesos.FrameworkReregisteredMessage{
 		FrameworkId: &mesos.FrameworkID{Value: proto.String("test-framework-1")},
 		MasterInfo: &mesos.MasterInfo{
@@ -244,6 +252,8 @@ func TestResourceOffersMessage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	proc.started = true
+	proc.aborted = false
 
 	msg := &mesos.ResourceOffersMessage{
 		Offers: []*mesos.Offer{
@@ -290,6 +300,8 @@ func TestRescindOfferMessage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	proc.started = true
+	proc.aborted = false
 
 	msg := &mesos.RescindResourceOfferMessage{
 		OfferId: &mesos.OfferID{Value: proto.String("offer-2")},
@@ -338,6 +350,8 @@ func TestStatusUpdateMessage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	proc.started = true
+	proc.aborted = false
 
 	msg := &mesos.StatusUpdateMessage{
 		Update: &mesos.StatusUpdate{
@@ -388,6 +402,8 @@ func TestFrameworkMessage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	proc.started = true
+	proc.aborted = false
 
 	msg := &mesos.ExecutorToFrameworkMessage{
 		SlaveId:     &mesos.SlaveID{Value: proto.String("test-slave-1")},
@@ -429,6 +445,8 @@ func TestLostSlaveMessage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	proc.started = true
+	proc.aborted = false
 
 	msg := &mesos.LostSlaveMessage{SlaveId: &mesos.SlaveID{Value: proto.String("test-slave-1")}}
 

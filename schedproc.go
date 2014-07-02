@@ -46,6 +46,8 @@ type schedulerProcess struct {
 	processId schedProcID
 	eventMsgQ chan<- interface{}
 	controlQ  chan int32
+	started   bool
+	aborted   bool
 }
 
 // newSchedHttpProcess creates and starts htttp process.
@@ -65,6 +67,8 @@ func newSchedulerProcess(eventQ chan<- interface{}) (*schedulerProcess, error) {
 		server:    serv,
 		eventMsgQ: eventQ,
 		controlQ:  make(chan int32),
+		started:   false,
+		aborted:   false,
 	}
 
 	return proc, nil
@@ -100,6 +104,7 @@ func (proc *schedulerProcess) start() error {
 	if rsp.StatusCode != http.StatusOK {
 		return NewMesosError("SchedProc.server ping failed. Server may not be running.")
 	}
+	proc.started = true
 	return nil
 }
 
@@ -110,6 +115,7 @@ func (proc *schedulerProcess) stop() error {
 	if err != nil {
 		return err
 	}
+	proc.started = false
 	return nil
 }
 
@@ -140,6 +146,13 @@ func (proc *schedulerProcess) ServeHTTP(rsp http.ResponseWriter, req *http.Reque
 	_, internalName := path.Split(req.URL.Path)      // returns mesos.internal.<MessageTypeName>
 	messageParts := strings.Split(internalName, ".") // last index is messageType.
 
+	// do not continue if marked aborted or stopped.
+	if proc.aborted || !proc.started {
+		comment = "SchedProc is either not started or aborted, ignoring call: " + req.URL.Path
+		err := NewMesosError(comment)
+		proc.eventMsgQ <- err
+		code = http.StatusMethodNotAllowed
+	} else
 	// if request path is badly formed
 	if len(messageParts) != 3 {
 		err := NewMesosError("Event posted by master is malformed:" + req.URL.Path)

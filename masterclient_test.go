@@ -131,6 +131,36 @@ func TestUnregisterFramework(t *testing.T) {
 	master.UnregisterFramework(newSchedProcID(":7000"), frameworkId)
 }
 
+func TestDeactivateFramework(t *testing.T) {
+	server := makeMockServer(func(rsp http.ResponseWriter, req *http.Request) {
+		cmdPath := buildReqPath(DEACTIVATE_FRAMEWORK_CALL)
+		if req.URL.Path != cmdPath {
+			t.Fatalf("Expected URL path not found.")
+		}
+
+		data, err := ioutil.ReadAll(req.Body)
+		if err != nil {
+			t.Fatalf("Unable to get FrameworkID data")
+		}
+		defer req.Body.Close()
+
+		msg := new(mesos.DeactivateFrameworkMessage)
+		err = proto.Unmarshal(data, msg)
+		if err != nil {
+			t.Fatal("Problem unmarshaling DeactivateFrameworkMessage")
+		}
+
+		if msg.GetFrameworkId().GetValue() != "test-framework-1" {
+			t.Fatal("Got bad FrameworkID.")
+		}
+	})
+	defer server.Close()
+	url, _ := url.Parse(server.URL)
+	master := newMasterClient(url.Host)
+	frameworkId := &mesos.FrameworkID{Value: proto.String("test-framework-1")}
+	master.DeactivateFramework(newSchedProcID(":7000"), frameworkId)
+}
+
 func makeMockServer(handler func(rsp http.ResponseWriter, req *http.Request)) *httptest.Server {
 	server := httptest.NewServer(http.HandlerFunc(handler))
 	log.Println("Created server  " + server.URL)

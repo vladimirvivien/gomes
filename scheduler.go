@@ -146,7 +146,7 @@ func (driver *SchedulerDriver) Stop(failover bool) mesos.Status {
 		err = driver.masterClient.UnregisterFramework(driver.schedProc.processId, driver.FrameworkInfo.Id)
 		if err != nil {
 			driver.Status = mesos.Status_DRIVER_ABORTED
-			driver.schedMsgQ <- NewMesosError("Failed to register the framework:" + err.Error())
+			driver.schedMsgQ <- NewMesosError("Failed to unregister the framework:" + err.Error())
 		} else {
 			driver.Status = mesos.Status_DRIVER_STOPPED
 		}
@@ -154,6 +154,29 @@ func (driver *SchedulerDriver) Stop(failover bool) mesos.Status {
 
 	driver.controlQ <- driver.Status // signal
 	return driver.Status
+}
+
+func (driver *SchedulerDriver) Abort() mesos.Status {
+	log.Printf("Aborting framework [%s]", driver.FrameworkInfo.GetId().GetValue())
+	if driver.Status != mesos.Status_DRIVER_RUNNING {
+		return driver.Status
+	}
+
+	if !driver.masterClient.connected {
+		log.Println("Not sending deactivate message, master is disconnected.")
+	} else {
+		err := driver.masterClient.DeactivateFramework(driver.schedProc.processId, driver.FrameworkInfo.Id)
+		if err != nil {
+			driver.schedMsgQ <- NewMesosError("Failed to abort the framework:" + err.Error())
+		} else {
+			driver.schedProc.aborted = true
+			driver.Status = mesos.Status_DRIVER_ABORTED
+		}
+	}
+
+	driver.controlQ <- driver.Status // signal
+	return driver.Status
+
 }
 
 func setupSchedMsgQ(driver *SchedulerDriver) {
@@ -211,6 +234,11 @@ func setupSchedMsgQ(driver *SchedulerDriver) {
 
 		case MesosError:
 			go func() {
+				if driver.Status == mesos.Status_DRIVER_ABORTED {
+					log.Println("Ignoring error because driver is aborted.")
+					return
+				}
+				// TODO call driver.Abort()
 				if sched != nil {
 					sched.Error(driver, msg)
 				}
@@ -218,7 +246,7 @@ func setupSchedMsgQ(driver *SchedulerDriver) {
 		default:
 			go func() {
 				if sched != nil {
-					sched.Error(driver, MesosError("Received unexpected event from server."))
+					sched.Error(driver, NewMesosError("Driver received unexpected event."))
 				}
 			}()
 		}

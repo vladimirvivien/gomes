@@ -14,6 +14,7 @@ const (
 const (
 	REGISTER_FRAMEWORK_CALL   = "RegisterFrameworkMessage"
 	UNREGISTER_FRAMEWORK_CALL = "UnregisterFrameworkMessage"
+	DEACTIVATE_FRAMEWORK_CALL = "DeactivateFrameworkMessage"
 )
 
 // Events from Mesos Master
