@@ -13,29 +13,29 @@ import (
 )
 
 func TestNewSchedID(t *testing.T) {
-	re1 := regexp.MustCompile(`^[a-z]+\(\d\)@.*$`)
+	re1 := regexp.MustCompile(`^[a-z]+\(\d+\)@.*$`)
 	id1 := newSchedProcID(":5000")
 	if !re1.MatchString(string(id1.value)) {
 		t.Error("SchedID not generated properly:", id1.value)
 	}
 
 	id2 := newSchedProcID(":6000")
-	re2 := regexp.MustCompile(`^[a-z]+\(\d\)@.*$`)
+	re2 := regexp.MustCompile(`^[a-z]+\(\d+\)@.*$`)
 	if !re2.MatchString(string(id2.value)) {
 		t.Error("SchedID not generated properly.  Expected prefix scheduler(2):", id1.value)
 	}
 	id3 := newSchedProcID(":7000")
-	re3 := regexp.MustCompile(`^[a-z]+\(\d\)$`)
+	re3 := regexp.MustCompile(`^[a-z]+\(\d+\)$`)
 	if !re3.MatchString(id3.prefix) {
 		t.Error("SchedID has invalid prefix:", id3.prefix)
 	}
 }
 
 func TestNewFullSchedID(t *testing.T) {
-	re1 := regexp.MustCompile(`scheduler\(\d\)@machine1:4040`)
+	re1 := regexp.MustCompile(`scheduler\(\d+\)@machine1:4040`)
 	id1 := newSchedProcID("machine1:4040")
 	if !re1.MatchString(id1.value) {
-		t.Errorf("Expecting SchedID [%s], but got [%s]", `scheduler\(\d\)@machine1:4040`, id1.value)
+		t.Errorf("Expecting SchedID [%s], but got [%s]", `scheduler\(\d+\)@machine1:4040`, id1.value)
 	}
 }
 
