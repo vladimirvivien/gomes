@@ -22,7 +22,7 @@ func newMasterClient(master string) *masterClient {
 		httpClient: http.Client{
 			Transport: &http.Transport{
 				Dial: func(netw, addr string) (net.Conn, error) {
-					c, err := net.DialTimeout(netw, addr, time.Second*17)
+					c, err := net.DialTimeout(netw, addr, time.Second*7)
 					if err != nil {
 						return nil, err
 					}
@@ -31,6 +31,8 @@ func newMasterClient(master string) *masterClient {
 				DisableCompression: true,
 			},
 		},
+
+		connected: true, //TODO fix
 	}
 }
 

@@ -56,7 +56,7 @@ func TestScheDriverCreation_WithFrameworkInfo_Override(t *testing.T) {
 	}
 }
 
-func TestStartDriver(t *testing.T) {
+func TestDriverStart(t *testing.T) {
 	// test server to accept Framework Registration
 	server := makeMockServer(func(rsp http.ResponseWriter, req *http.Request) {
 		rsp.WriteHeader(http.StatusAccepted)
@@ -73,7 +73,7 @@ func TestStartDriver(t *testing.T) {
 	}
 }
 
-func TestStartDriver_WithNoMasterAvailable(t *testing.T) {
+func TestDriverStart_WithNoMasterAvailable(t *testing.T) {
 	driver, err := NewSchedDriver(nil, makeMockFrameworkInfo(), "localhost:50501")
 	if err != nil {
 		t.Fatal("Error creating SchedulerDriver", err)
@@ -85,8 +85,44 @@ func TestStartDriver_WithNoMasterAvailable(t *testing.T) {
 	}
 }
 
-func TestJoinDriver(t *testing.T) {
+func TestDriverJoin(t *testing.T) {
+	driver, err := NewSchedDriver(nil, makeMockFrameworkInfo(), ":15050")
+	if err != nil {
+		t.Fatal("Error creating SchedulerDriver", err)
+	}
 
+	driver.Status = mesos.Status_DRIVER_RUNNING
+	go func() {
+		stat := driver.Join()
+		if stat != mesos.Status_DRIVER_STOPPED {
+			t.Fatal("Expected mesos.Status_DRIVER_STOPPED, but got", stat)
+			<-driver.controlQ // bleed chan
+		}
+
+	}()
+	driver.controlQ <- mesos.Status_DRIVER_STOPPED
+}
+
+func TestDriverRun(t *testing.T) {
+	server := makeMockServer(func(rsp http.ResponseWriter, req *http.Request) {
+		rsp.WriteHeader(http.StatusAccepted)
+	})
+	defer server.Close()
+	url, _ := url.Parse(server.URL)
+	driver, err := NewSchedDriver(nil, makeMockFrameworkInfo(), url.Host)
+	if err != nil {
+		t.Fatal("Error creating SchedulerDriver", err)
+	}
+
+	go func() {
+		stat := driver.Run()
+		if stat != mesos.Status_DRIVER_ABORTED {
+			t.Fatal("Expected mesos.Status_DRIVER_ABORTED, but got ", stat)
+			<-driver.controlQ // bleed chan
+		}
+	}()
+
+	driver.controlQ <- mesos.Status_DRIVER_ABORTED
 }
 
 type mockScheduler string

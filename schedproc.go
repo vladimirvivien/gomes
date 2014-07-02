@@ -80,16 +80,26 @@ func (proc *schedulerProcess) start() error {
 	proc.listener = listener
 	proc.processId = newSchedProcID(addr)
 	proc.registerEventHandlers()
+
+	// launch internal http.server
 	go func(lis net.Listener) {
 		err := proc.server.Serve(lis)
 		// TODO hack: if error.Op = 'accept' assume connection got closed
-		//      and server.listener stopped blocking on accept.
+		//      and server.listener stopped blocking on Accept() operation.
 		val, ok := err.(*net.OpError)
 		if !ok || val.Op != "accept" {
 			proc.eventMsgQ <- err
 		}
 	}(proc.listener)
 
+	// ping proc.server listening at proc.listener.Addr()
+	rsp, err := http.Get("http://" + proc.listener.Addr().String() + "/isalive")
+	if err != nil {
+		return err
+	}
+	if rsp.StatusCode != http.StatusOK {
+		return NewMesosError("SchedProc.server ping failed. Server may not be running.")
+	}
 	return nil
 }
 
@@ -98,9 +108,6 @@ func (proc *schedulerProcess) stop() error {
 	//TODO Needs a better way than this.
 	err := proc.listener.Close()
 	if err != nil {
-		if _, ok := err.(*net.OpError); ok {
-			return nil // ignore error caused by closing listener (for now)
-		}
 		return err
 	}
 	return nil
@@ -108,6 +115,13 @@ func (proc *schedulerProcess) stop() error {
 
 // registerEventHandlers Registers http handlers for Mesos master events.
 func (proc *schedulerProcess) registerEventHandlers() {
+	//TODO hack: only way to clear default mux.
+	//     fix - maybe use custom mux
+	http.DefaultServeMux = http.NewServeMux()
+	http.HandleFunc("/isalive", func(rsp http.ResponseWriter, req *http.Request) {
+		rsp.WriteHeader(http.StatusOK)
+	})
+
 	http.Handle(makeProcEventPath(proc, FRAMEWORK_REGISTERED_EVENT), proc)
 	http.Handle(makeProcEventPath(proc, FRAMEWORK_REREGISTERED_EVENT), proc)
 	http.Handle(makeProcEventPath(proc, RESOURCE_OFFERS_EVENT), proc)

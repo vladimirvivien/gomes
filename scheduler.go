@@ -97,6 +97,8 @@ func (driver *SchedulerDriver) Start() mesos.Status {
 	if driver.Status != mesos.Status_DRIVER_NOT_STARTED {
 		return driver.Status
 	}
+
+	// start sched proc and proc.server (http)
 	err := driver.schedProc.start()
 	if err != nil {
 		driver.Status = mesos.Status_DRIVER_NOT_STARTED
@@ -104,8 +106,7 @@ func (driver *SchedulerDriver) Start() mesos.Status {
 		return driver.Status
 	}
 
-	// TODO: should ping scheduler process here to make sure
-	// http process is up and running with no issue.
+	// register framework
 	err = driver.masterClient.RegisterFramework(driver.schedProc.processId, driver.FrameworkInfo)
 	if err != nil {
 		driver.Status = mesos.Status_DRIVER_NOT_STARTED
@@ -144,7 +145,7 @@ func (driver *SchedulerDriver) Stop(failover bool) mesos.Status {
 	}
 
 	if driver.masterClient.connected && !failover {
-		// send UnregisterFrameworkMessage to master.
+		// TODO send UnregisterFrameworkMessage to master.
 	}
 
 	driver.Status = mesos.Status_DRIVER_STOPPED
