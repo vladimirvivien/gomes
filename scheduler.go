@@ -101,7 +101,7 @@ func (driver *SchedulerDriver) Start() mesos.Status {
 	// start sched proc and proc.server (http)
 	err := driver.schedProc.start()
 	if err != nil {
-		driver.Status = mesos.Status_DRIVER_NOT_STARTED
+		driver.Status = mesos.Status_DRIVER_ABORTED
 		driver.schedMsgQ <- err
 		return driver.Status
 	}
@@ -109,10 +109,8 @@ func (driver *SchedulerDriver) Start() mesos.Status {
 	// register framework
 	err = driver.masterClient.RegisterFramework(driver.schedProc.processId, driver.FrameworkInfo)
 	if err != nil {
-		driver.Status = mesos.Status_DRIVER_NOT_STARTED
-		if driver.Scheduler != nil {
-			driver.Scheduler.Error(driver, MesosError("Failed to register the framework:"+err.Error()))
-		}
+		driver.Status = mesos.Status_DRIVER_ABORTED
+		driver.schedMsgQ <- NewMesosError("Failed to register the framework:" + err.Error())
 	} else {
 		driver.Status = mesos.Status_DRIVER_RUNNING
 	}
@@ -135,7 +133,7 @@ func (driver *SchedulerDriver) Run() mesos.Status {
 }
 
 func (driver *SchedulerDriver) Stop(failover bool) mesos.Status {
-	log.Printf("Stopping framework %s", driver.FrameworkInfo.GetId().GetValue())
+	log.Printf("Stopping framework [%s]", driver.FrameworkInfo.GetId().GetValue())
 	if driver.Status != mesos.Status_DRIVER_RUNNING && driver.Status != mesos.Status_DRIVER_ABORTED {
 		return driver.Status
 	}
@@ -145,10 +143,16 @@ func (driver *SchedulerDriver) Stop(failover bool) mesos.Status {
 	}
 
 	if driver.masterClient.connected && !failover {
-		// TODO send UnregisterFrameworkMessage to master.
+		err = driver.masterClient.UnregisterFramework(driver.schedProc.processId, driver.FrameworkInfo.Id)
+		if err != nil {
+			driver.Status = mesos.Status_DRIVER_ABORTED
+			driver.schedMsgQ <- NewMesosError("Failed to register the framework:" + err.Error())
+		} else {
+			driver.Status = mesos.Status_DRIVER_STOPPED
+		}
 	}
 
-	driver.Status = mesos.Status_DRIVER_STOPPED
+	driver.controlQ <- driver.Status // signal
 	return driver.Status
 }
 
@@ -157,23 +161,66 @@ func setupSchedMsgQ(driver *SchedulerDriver) {
 	for event := range driver.schedMsgQ {
 		switch msg := event.(type) {
 		case *mesos.FrameworkRegisteredMessage:
-			go sched.Registered(driver, msg.FrameworkId, msg.MasterInfo)
+			go func() {
+				if sched != nil {
+					sched.Registered(driver, msg.FrameworkId, msg.MasterInfo)
+				}
+			}()
+
 		case *mesos.FrameworkReregisteredMessage:
-			go sched.Reregistered(driver, msg.MasterInfo)
+			go func() {
+				if sched != nil {
+					sched.Reregistered(driver, msg.MasterInfo)
+				}
+			}()
+
 		case *mesos.ResourceOffersMessage:
-			go sched.ResourceOffers(driver, msg.Offers)
+			go func() {
+				if sched != nil {
+					sched.ResourceOffers(driver, msg.Offers)
+				}
+			}()
+
 		case *mesos.RescindResourceOfferMessage:
-			go sched.OfferRescinded(driver, msg.OfferId)
+			go func() {
+				if sched != nil {
+					sched.OfferRescinded(driver, msg.OfferId)
+				}
+			}()
+
 		case *mesos.StatusUpdateMessage:
-			go sched.StatusUpdate(driver, msg.Update.Status)
+			go func() {
+				if sched != nil {
+					sched.StatusUpdate(driver, msg.Update.Status)
+				}
+			}()
+
 		case *mesos.ExecutorToFrameworkMessage:
-			go sched.FrameworkMessage(driver, msg.ExecutorId, msg.SlaveId, msg.Data)
+			go func() {
+				if sched != nil {
+					sched.FrameworkMessage(driver, msg.ExecutorId, msg.SlaveId, msg.Data)
+				}
+			}()
+
 		case *mesos.LostSlaveMessage:
-			go sched.SlaveLost(driver, msg.SlaveId)
+			go func() {
+				if sched != nil {
+					sched.SlaveLost(driver, msg.SlaveId)
+				}
+			}()
+
 		case MesosError:
-			sched.Error(driver, msg)
+			go func() {
+				if sched != nil {
+					sched.Error(driver, msg)
+				}
+			}()
 		default:
-			sched.Error(driver, MesosError("Received unexpected event from server."))
+			go func() {
+				if sched != nil {
+					sched.Error(driver, MesosError("Received unexpected event from server."))
+				}
+			}()
 		}
 	}
 }

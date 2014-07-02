@@ -42,6 +42,11 @@ func (client *masterClient) RegisterFramework(schedId schedProcID, framework *me
 	return client.send(schedId, buildReqPath(REGISTER_FRAMEWORK_CALL), regMsg)
 }
 
+func (client *masterClient) UnregisterFramework(schedId schedProcID, frameworkId *mesos.FrameworkID) error {
+	msg := &mesos.UnregisterFrameworkMessage{FrameworkId: frameworkId}
+	return client.send(schedId, buildReqPath(UNREGISTER_FRAMEWORK_CALL), msg)
+}
+
 func (client *masterClient) send(from schedProcID, reqPath string, msg proto.Message) error {
 	u, err := client.address.AsHttpURL()
 	if err != nil {

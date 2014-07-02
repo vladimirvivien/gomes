@@ -12,7 +12,8 @@ const (
 
 // calls from sched to master
 const (
-	REGISTER_FRAMEWORK_CALL = "RegisterFrameworkMessage"
+	REGISTER_FRAMEWORK_CALL   = "RegisterFrameworkMessage"
+	UNREGISTER_FRAMEWORK_CALL = "UnregisterFrameworkMessage"
 )
 
 // Events from Mesos Master

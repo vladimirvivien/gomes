@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/user"
 	"testing"
+	"time"
 )
 
 func TestScheDriverCreation(t *testing.T) {
@@ -123,6 +124,31 @@ func TestDriverRun(t *testing.T) {
 	}()
 
 	driver.controlQ <- mesos.Status_DRIVER_ABORTED
+}
+
+func TestDriverStop(t *testing.T) {
+	server := makeMockServer(func(rsp http.ResponseWriter, req *http.Request) {
+		rsp.WriteHeader(http.StatusAccepted)
+	})
+	defer server.Close()
+	url, _ := url.Parse(server.URL)
+	driver, err := NewSchedDriver(nil, makeMockFrameworkInfo(), url.Host)
+	if err != nil {
+		t.Fatal("Error creating SchedulerDriver", err)
+	}
+
+	go func() {
+		stat := driver.Run()
+		if stat != mesos.Status_DRIVER_STOPPED {
+			t.Fatal("Expected mesos.Status_DRIVER_STOPPED, but got ", stat)
+			<-driver.controlQ // bleed chan
+		}
+	}()
+	time.Sleep(101 * time.Millisecond) // stall.
+	if driver.Status != mesos.Status_DRIVER_RUNNING {
+		t.Fatal("Expected DRIVER_RUNNING, but got ", driver.Status)
+	}
+	driver.Stop(false)
 }
 
 type mockScheduler string
