@@ -1,7 +1,7 @@
 package gomes
 
 import (
-	proto "code.google.com/p/goprotobuf/proto"
+	"code.google.com/p/goprotobuf/proto"
 	"fmt"
 	mesos "github.com/vladimirvivien/gomes/mesosproto"
 	"log"
@@ -18,20 +18,9 @@ func (err MesosError) Error() string {
 	return string(err)
 }
 
-type Scheduler interface {
-	Registered(schedDriver *SchedulerDriver, frameworkId *mesos.FrameworkID, masterInfo *mesos.MasterInfo)
-	Reregistered(schedDriver *SchedulerDriver, masterInfo *mesos.MasterInfo)
-	ResourceOffers(schedDriver *SchedulerDriver, offers []*mesos.Offer)
-	OfferRescinded(schedDriver *SchedulerDriver, offerId *mesos.OfferID)
-	StatusUpdate(schedDriver *SchedulerDriver, taskStatus *mesos.TaskStatus)
-	FrameworkMessage(schedDriver *SchedulerDriver, execId *mesos.ExecutorID, slaveId *mesos.SlaveID, data []byte)
-	SlaveLost(schedDriver *SchedulerDriver, slaveId *mesos.SlaveID)
-	Error(schedDriver *SchedulerDriver, err MesosError)
-}
-
 type SchedulerDriver struct {
 	Master        string
-	Scheduler     Scheduler
+	Scheduler     *Scheduler
 	FrameworkInfo *mesos.FrameworkInfo
 	Status        mesos.Status
 
@@ -41,7 +30,7 @@ type SchedulerDriver struct {
 	schedProc    *schedulerProcess
 }
 
-func NewSchedDriver(scheduler Scheduler, framework *mesos.FrameworkInfo, master string) (*SchedulerDriver, error) {
+func NewSchedDriver(scheduler *Scheduler, framework *mesos.FrameworkInfo, master string) (*SchedulerDriver, error) {
 	if master == "" {
 		return nil, fmt.Errorf("Missing master address.")
 	}
@@ -71,10 +60,13 @@ func NewSchedDriver(scheduler Scheduler, framework *mesos.FrameworkInfo, master 
 
 	driver := &SchedulerDriver{
 		Master:        master,
-		Scheduler:     scheduler,
 		FrameworkInfo: framework,
 		schedMsgQ:     make(chan interface{}, 10),
 		controlQ:      make(chan mesos.Status),
+	}
+
+	if scheduler == nil {
+		driver.Scheduler = NewMesosScheduler()
 	}
 
 	proc, err := newSchedulerProcess(driver.schedMsgQ)
@@ -182,52 +174,56 @@ func (driver *SchedulerDriver) Abort() mesos.Status {
 func setupSchedMsgQ(driver *SchedulerDriver) {
 	sched := driver.Scheduler
 	for event := range driver.schedMsgQ {
+		if driver.Scheduler == nil {
+			break
+		}
+
 		switch msg := event.(type) {
 		case *mesos.FrameworkRegisteredMessage:
 			go func() {
-				if sched != nil {
+				if sched.Registered != nil {
 					sched.Registered(driver, msg.FrameworkId, msg.MasterInfo)
 				}
 			}()
 
 		case *mesos.FrameworkReregisteredMessage:
 			go func() {
-				if sched != nil {
+				if sched.Reregistered != nil {
 					sched.Reregistered(driver, msg.MasterInfo)
 				}
 			}()
 
 		case *mesos.ResourceOffersMessage:
 			go func() {
-				if sched != nil {
+				if sched.ResourceOffers != nil {
 					sched.ResourceOffers(driver, msg.Offers)
 				}
 			}()
 
 		case *mesos.RescindResourceOfferMessage:
 			go func() {
-				if sched != nil {
+				if sched.OfferRescinded != nil {
 					sched.OfferRescinded(driver, msg.OfferId)
 				}
 			}()
 
 		case *mesos.StatusUpdateMessage:
 			go func() {
-				if sched != nil {
+				if sched.StatusUpdate != nil {
 					sched.StatusUpdate(driver, msg.Update.Status)
 				}
 			}()
 
 		case *mesos.ExecutorToFrameworkMessage:
 			go func() {
-				if sched != nil {
+				if sched.FrameworkMessage != nil {
 					sched.FrameworkMessage(driver, msg.ExecutorId, msg.SlaveId, msg.Data)
 				}
 			}()
 
 		case *mesos.LostSlaveMessage:
 			go func() {
-				if sched != nil {
+				if sched.SlaveLost != nil {
 					sched.SlaveLost(driver, msg.SlaveId)
 				}
 			}()
@@ -252,7 +248,7 @@ func (driver *SchedulerDriver) handleDriverError(err MesosError) {
 	}
 	stat := driver.Abort()
 	if stat == mesos.Status_DRIVER_ABORTED {
-		if driver.Scheduler != nil {
+		if driver.Scheduler.Error != nil {
 			driver.Scheduler.Error(driver, err)
 		}
 	}

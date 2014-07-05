@@ -151,102 +151,51 @@ func TestDriverStop(t *testing.T) {
 	driver.Stop(false)
 }
 
-type mockScheduler string
-
-func (sched mockScheduler) Registered(driver *SchedulerDriver, frameworkId *mesos.FrameworkID, masterInfo *mesos.MasterInfo) {
-	log.Println("mockScheduler.Registered() called...")
-	if driver == nil {
-		log.Fatalf("Scheduler.Registered expects a SchedulerDriver, but got nil.")
-	}
-	if frameworkId == nil {
-		log.Fatalf("Scheduler.Registered expects frameworkId, but got nil.")
-	}
-	if frameworkId.GetValue() != "test-framework-1" {
-		log.Fatalf("Scheduler.Registered got unexpected frameworkId value: " + frameworkId.GetValue())
-	}
-	if masterInfo == nil {
-		log.Fatalf("Scheduler.Registered expects masterInfo, but got nil")
+func TestDriverAbort(t *testing.T) {
+	server := makeMockServer(func(rsp http.ResponseWriter, req *http.Request) {
+		rsp.WriteHeader(http.StatusAccepted)
+	})
+	defer server.Close()
+	url, _ := url.Parse(server.URL)
+	driver, err := NewSchedDriver(nil, makeMockFrameworkInfo(), url.Host)
+	if err != nil {
+		t.Fatal("Error creating SchedulerDriver", err)
 	}
 
-	if masterInfo.GetId() != "localhost:0" ||
-		masterInfo.GetIp() != 123456 ||
-		masterInfo.GetPort() != 12345 {
-		log.Fatalf("Scheduler.Registered expected MasterInfo values are missing.")
+	go func() {
+		stat := driver.Run()
+		if stat != mesos.Status_DRIVER_ABORTED {
+			t.Fatal("Expected mesos.Status_DRIVER_STOPPED, but got ", stat)
+			<-driver.controlQ // bleed chan
+		}
+	}()
+	time.Sleep(101 * time.Millisecond) // stall.
+	if driver.Status != mesos.Status_DRIVER_RUNNING {
+		t.Fatal("Expected DRIVER_RUNNING, but got ", driver.Status)
 	}
-}
-
-func (sched mockScheduler) Reregistered(driver *SchedulerDriver, masterInfo *mesos.MasterInfo) {
-	log.Println("mockScheduler.Reregistered() called...")
-	if driver == nil {
-		log.Fatalf("Scheduler.Reregistered expects a SchedulerDriver, but got nil.")
-	}
-	if masterInfo == nil {
-		log.Fatalf("Scheduler.Reregistered expects masterInfo, but got nil")
-	}
-
-	if masterInfo.GetId() != "master-1" ||
-		masterInfo.GetIp() != 123456 ||
-		masterInfo.GetPort() != 12345 {
-		log.Fatalf("Scheduler.Registered expected MasterInfo values are missing.")
-	}
-}
-
-func (sched mockScheduler) ResourceOffers(driver *SchedulerDriver, offers []*mesos.Offer) {
-	log.Println("mockScheduler.ResourceOffers called...")
-	if len(offers) != 1 {
-		log.Fatalf("Scheduler.ResourceOffers expected 1 offer, but got", len(offers))
-	}
-	if offers[0].GetId().GetValue() != "offer-1" {
-		log.Fatalln("Scheduler.ResourceOffers exepected value not received")
-	}
-}
-
-func (sched mockScheduler) OfferRescinded(driver *SchedulerDriver, offerId *mesos.OfferID) {
-	log.Println("mockScheduler.OfferRescinded called...")
-	if offerId.GetValue() != "offer-2" {
-		log.Fatalln("Scheduler.OfferRescinded exepected value not received")
-	}
-}
-
-func (sched mockScheduler) StatusUpdate(schedDriver *SchedulerDriver, taskStatus *mesos.TaskStatus) {
-	log.Println("mockScheduler.StatusUpdate called...")
-	if taskStatus.GetState() != mesos.TaskState(mesos.TaskState_TASK_RUNNING) {
-		log.Fatal("Scheduler.StatusUpdate expected State value not received.")
-	}
-
-	if string(taskStatus.GetData()) != "World!" {
-		log.Fatal("Scheduler.StatusUpdate expected Status.Data not received.")
-	}
-}
-
-func (sched mockScheduler) FrameworkMessage(schedDriver *SchedulerDriver, execId *mesos.ExecutorID, slaveId *mesos.SlaveID, data []byte) {
-	log.Println("mockScheduler.FrameworkMessage called...")
-	if execId.GetValue() != "test-executor-1" {
-		log.Fatal("Scheduler.FrameworkMessage.ExecutorId not received.")
-	}
-
-	if slaveId.GetValue() != "test-slave-1" {
-		log.Fatal("Scheduler.FrameworkMessage.SlaveId not received.")
-	}
-
-	if string(data) != "Hello-Test" {
-		log.Fatal("Scheduler.FrameworkMessage.Data not received.")
-	}
-}
-
-func (sched mockScheduler) SlaveLost(driver *SchedulerDriver, slaveId *mesos.SlaveID) {
-	log.Println("mockScheduler.SlaveLost called...")
-	if slaveId.GetValue() != "test-slave-1" {
-		log.Fatal("Scheduler.SlaveLost.SlaveID not received.")
-	}
-}
-
-func (sched mockScheduler) Error(driver *SchedulerDriver, err MesosError) {
-	log.Println("mockScheduler.Error() called...")
-	log.Println("SchedulerDriver received an error: " + err.Error())
+	driver.Abort()
 }
 
 func TestFrameworkRegisteredMessageHandling(t *testing.T) {
+	sched := NewMesosScheduler()
+	sched.Registered = func(driver *SchedulerDriver, frameworkId *mesos.FrameworkID, masterInfo *mesos.MasterInfo) {
+		if frameworkId == nil {
+			log.Fatalf("Scheduler.Registered expects frameworkId, but got nil.")
+		}
+		if frameworkId.GetValue() != "test-framework-1" {
+			log.Fatalf("Scheduler.Registered got unexpected frameworkId value: " + frameworkId.GetValue())
+		}
+		if masterInfo == nil {
+			log.Fatalf("Scheduler.Registered expects masterInfo, but got nil")
+		}
+
+		if masterInfo.GetId() != "localhost:0" ||
+			masterInfo.GetIp() != 123456 ||
+			masterInfo.GetPort() != 12345 {
+			log.Fatalf("Scheduler.Registered expected MasterInfo values are missing.")
+		}
+	}
+
 	msg := &mesos.FrameworkRegisteredMessage{
 		FrameworkId: &mesos.FrameworkID{Value: proto.String("test-framework-1")},
 		MasterInfo: &mesos.MasterInfo{
@@ -255,7 +204,7 @@ func TestFrameworkRegisteredMessageHandling(t *testing.T) {
 			Port: proto.Uint32(12345),
 		},
 	}
-	driver, err := NewSchedDriver(mockScheduler("Mock"), &mesos.FrameworkInfo{}, "localhost:0")
+	driver, err := NewSchedDriver(sched, &mesos.FrameworkInfo{}, "localhost:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,6 +212,19 @@ func TestFrameworkRegisteredMessageHandling(t *testing.T) {
 }
 
 func TestFrameworkReRegisteredMessageHandling(t *testing.T) {
+	sched := NewMesosScheduler()
+	sched.Reregistered = func(driver *SchedulerDriver, masterInfo *mesos.MasterInfo) {
+		if masterInfo == nil {
+			log.Fatalf("Scheduler.Reregistered expects masterInfo, but got nil")
+		}
+
+		if masterInfo.GetId() != "master-1" ||
+			masterInfo.GetIp() != 123456 ||
+			masterInfo.GetPort() != 12345 {
+			log.Fatalf("Scheduler.Registered expected MasterInfo values are missing.")
+		}
+	}
+
 	msg := &mesos.FrameworkReregisteredMessage{
 		FrameworkId: &mesos.FrameworkID{Value: proto.String("test-framework-1")},
 		MasterInfo: &mesos.MasterInfo{
@@ -271,7 +233,7 @@ func TestFrameworkReRegisteredMessageHandling(t *testing.T) {
 			Port: proto.Uint32(12345),
 		},
 	}
-	driver, err := NewSchedDriver(mockScheduler("Mock"), &mesos.FrameworkInfo{}, "localhost:0")
+	driver, err := NewSchedDriver(sched, &mesos.FrameworkInfo{}, "localhost:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -279,6 +241,16 @@ func TestFrameworkReRegisteredMessageHandling(t *testing.T) {
 }
 
 func TestResourceOffersMessageHandling(t *testing.T) {
+	sched := NewMesosScheduler()
+	sched.ResourceOffers = func(driver *SchedulerDriver, offers []*mesos.Offer) {
+		if len(offers) != 1 {
+			log.Fatalf("Scheduler.ResourceOffers expected 1 offer, but got", len(offers))
+		}
+		if offers[0].GetId().GetValue() != "offer-1" {
+			log.Fatalln("Scheduler.ResourceOffers exepected value not received")
+		}
+	}
+
 	msg := &mesos.ResourceOffersMessage{
 		Offers: []*mesos.Offer{
 			&mesos.Offer{
@@ -289,7 +261,7 @@ func TestResourceOffersMessageHandling(t *testing.T) {
 			},
 		},
 	}
-	driver, err := NewSchedDriver(mockScheduler("Mock"), &mesos.FrameworkInfo{}, "localhost:0")
+	driver, err := NewSchedDriver(sched, &mesos.FrameworkInfo{}, "localhost:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -297,11 +269,18 @@ func TestResourceOffersMessageHandling(t *testing.T) {
 }
 
 func TestRescindOfferMessageHandling(t *testing.T) {
+	sched := NewMesosScheduler()
+	sched.OfferRescinded = func(driver *SchedulerDriver, offerId *mesos.OfferID) {
+		if offerId.GetValue() != "offer-2" {
+			log.Fatalln("Scheduler.OfferRescinded exepected value not received")
+		}
+	}
+
 	msg := &mesos.RescindResourceOfferMessage{
 		OfferId: &mesos.OfferID{Value: proto.String("offer-2")},
 	}
 
-	driver, err := NewSchedDriver(mockScheduler("Mock"), &mesos.FrameworkInfo{}, "localhost:0")
+	driver, err := NewSchedDriver(sched, &mesos.FrameworkInfo{}, "localhost:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -309,6 +288,17 @@ func TestRescindOfferMessageHandling(t *testing.T) {
 }
 
 func TestStatusUpdateMessageHandling(t *testing.T) {
+	sched := NewMesosScheduler()
+	sched.StatusUpdate = func(schedDriver *SchedulerDriver, taskStatus *mesos.TaskStatus) {
+		if taskStatus.GetState() != mesos.TaskState(mesos.TaskState_TASK_RUNNING) {
+			log.Fatal("Scheduler.StatusUpdate expected State value not received.")
+		}
+
+		if string(taskStatus.GetData()) != "World!" {
+			log.Fatal("Scheduler.StatusUpdate expected Status.Data not received.")
+		}
+	}
+
 	msg := &mesos.StatusUpdateMessage{
 		Update: &mesos.StatusUpdate{
 			FrameworkId: &mesos.FrameworkID{Value: proto.String("test-framework-1")},
@@ -323,7 +313,7 @@ func TestStatusUpdateMessageHandling(t *testing.T) {
 		},
 	}
 
-	driver, err := NewSchedDriver(mockScheduler("Mock"), &mesos.FrameworkInfo{}, "localhost:0")
+	driver, err := NewSchedDriver(sched, &mesos.FrameworkInfo{}, "localhost:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -331,13 +321,28 @@ func TestStatusUpdateMessageHandling(t *testing.T) {
 }
 
 func TestFrameworkMessageHandling(t *testing.T) {
+	sched := NewMesosScheduler()
+	sched.FrameworkMessage = func(schedDriver *SchedulerDriver, execId *mesos.ExecutorID, slaveId *mesos.SlaveID, data []byte) {
+		if execId.GetValue() != "test-executor-1" {
+			log.Fatal("Scheduler.FrameworkMessage.ExecutorId not received.")
+		}
+
+		if slaveId.GetValue() != "test-slave-1" {
+			log.Fatal("Scheduler.FrameworkMessage.SlaveId not received.")
+		}
+
+		if string(data) != "Hello-Test" {
+			log.Fatal("Scheduler.FrameworkMessage.Data not received.")
+		}
+	}
+
 	msg := &mesos.ExecutorToFrameworkMessage{
 		SlaveId:     &mesos.SlaveID{Value: proto.String("test-slave-1")},
 		FrameworkId: &mesos.FrameworkID{Value: proto.String("test-framework-1")},
 		ExecutorId:  &mesos.ExecutorID{Value: proto.String("test-executor-1")},
 		Data:        []byte("Hello-Test"),
 	}
-	driver, err := NewSchedDriver(mockScheduler("Mock"), &mesos.FrameworkInfo{}, "localhost:0")
+	driver, err := NewSchedDriver(sched, &mesos.FrameworkInfo{}, "localhost:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -346,9 +351,16 @@ func TestFrameworkMessageHandling(t *testing.T) {
 }
 
 func TestSlaveLostMessageHandling(t *testing.T) {
+	sched := NewMesosScheduler()
+	sched.SlaveLost = func(driver *SchedulerDriver, slaveId *mesos.SlaveID) {
+		if slaveId.GetValue() != "test-slave-1" {
+			log.Fatal("Scheduler.SlaveLost.SlaveID not received.")
+		}
+	}
+
 	msg := &mesos.LostSlaveMessage{SlaveId: &mesos.SlaveID{Value: proto.String("test-slave-1")}}
 
-	driver, err := NewSchedDriver(mockScheduler("Mock"), &mesos.FrameworkInfo{}, "localhost:0")
+	driver, err := NewSchedDriver(sched, &mesos.FrameworkInfo{}, "localhost:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -356,6 +368,18 @@ func TestSlaveLostMessageHandling(t *testing.T) {
 }
 
 func TestErrorMessageHandling(t *testing.T) {
-	driver, _ := NewSchedDriver(mockScheduler("Mock"), &mesos.FrameworkInfo{}, "localhost:0")
+	sched := NewMesosScheduler()
+	sched.Error = func(driver *SchedulerDriver, err MesosError) {
+		if &err == nil {
+			t.Fatal("SchedulerDriver expected Error to be generated, but got nil.")
+		}
+
+		// make sure driver aborted.
+		if driver.Status != mesos.Status_DRIVER_ABORTED {
+			t.Fatalf("Expected SchedulerDriver to have status, %s, but is %s", mesos.Status_DRIVER_ABORTED, driver.Status)
+		}
+	}
+
+	driver, _ := NewSchedDriver(sched, &mesos.FrameworkInfo{}, "localhost:0")
 	driver.schedMsgQ <- "Hello"
 }
