@@ -65,9 +65,7 @@ func NewSchedDriver(scheduler *Scheduler, framework *mesos.FrameworkInfo, master
 		controlQ:      make(chan mesos.Status),
 	}
 
-	if scheduler == nil {
-		driver.Scheduler = NewMesosScheduler()
-	}
+	driver.Scheduler = scheduler
 
 	proc, err := newSchedulerProcess(driver.schedMsgQ)
 	if err != nil {
@@ -175,6 +173,7 @@ func setupSchedMsgQ(driver *SchedulerDriver) {
 	sched := driver.Scheduler
 	for event := range driver.schedMsgQ {
 		if driver.Scheduler == nil {
+			log.Println("WARN: Scheduler not set.")
 			break
 		}
 
