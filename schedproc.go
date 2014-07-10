@@ -9,13 +9,11 @@ import (
 	"net/http"
 	"net/url"
 	"path"
-	"strconv"
 	"strings"
-	"sync"
+	"sync/atomic"
 )
 
-var schedIdMutex = new(sync.Mutex)
-var schedIdCounter = 0
+var schedIdCounter uint64 = 0
 
 type schedProcID struct {
 	prefix string
@@ -23,15 +21,13 @@ type schedProcID struct {
 }
 
 func newSchedProcID(addr string) schedProcID {
-	cntStr := strconv.Itoa(schedIdCounter)
-	prefix := MESOS_SCHEDULER_PREFIX + "(" + cntStr + ")"
+	counter := atomic.AddUint64(&schedIdCounter, uint64(1))
+	prefix := fmt.Sprintf("%s(%d)", MESOS_SCHEDULER_PREFIX, counter)
 	value := prefix + "@" + addr
 	id := schedProcID{prefix: prefix, value: value}
-	schedIdMutex.Lock()
-	schedIdCounter = schedIdCounter + 1
-	schedIdMutex.Unlock()
 	return id
 }
+
 func (id *schedProcID) asURL() (*url.URL, error) {
 	return url.Parse("http://" + id.value)
 }
@@ -57,10 +53,10 @@ func newSchedulerProcess(eventQ chan<- interface{}) (*schedulerProcess, error) {
 	}
 
 	serv := &http.Server{
-	//Addr: ":0",
-	//ReadTimeout:nil,
-	//WriteTimeout:
-	//ConnState : nil,
+		//Addr: ":0",
+		//ReadTimeout:nil,
+		//WriteTimeout:
+		//ConnState : nil,
 	}
 
 	proc := &schedulerProcess{
@@ -125,8 +121,8 @@ func (proc *schedulerProcess) registerEventHandlers() {
 	//     fix - maybe use custom mux
 	http.DefaultServeMux = http.NewServeMux()
 	http.HandleFunc("/isalive", func(rsp http.ResponseWriter, req *http.Request) {
-		rsp.WriteHeader(http.StatusOK)
-	})
+			rsp.WriteHeader(http.StatusOK)
+		})
 
 	http.Handle(makeProcEventPath(proc, FRAMEWORK_REGISTERED_EVENT), proc)
 	http.Handle(makeProcEventPath(proc, FRAMEWORK_REREGISTERED_EVENT), proc)
@@ -153,67 +149,67 @@ func (proc *schedulerProcess) ServeHTTP(rsp http.ResponseWriter, req *http.Reque
 		proc.eventMsgQ <- err
 		code = http.StatusMethodNotAllowed
 	} else
-	// if request path is badly formed
-	if len(messageParts) != 3 {
-		err := NewMesosError("Event posted by master is malformed:" + req.URL.Path)
-		proc.eventMsgQ <- err
-		code = http.StatusBadRequest
-		comment = "Request path malformed."
-	} else {
-		messageType := messageParts[2]
-
-		data, err := ioutil.ReadAll(req.Body)
-		if err != nil {
+		// if request path is badly formed
+		if len(messageParts) != 3 {
+			err := NewMesosError("Event posted by master is malformed:" + req.URL.Path)
+			proc.eventMsgQ <- err
 			code = http.StatusBadRequest
-			comment = "Request body missing."
-		}
-		defer req.Body.Close()
-
-		// dispatch msg based on type
-		var msg proto.Message
-		switch messageType {
-		case FRAMEWORK_REGISTERED_EVENT:
-			msg = new(mesos.FrameworkRegisteredMessage)
-			err = proto.Unmarshal(data, msg)
-
-		case FRAMEWORK_REREGISTERED_EVENT:
-			msg = new(mesos.FrameworkReregisteredMessage)
-			err = proto.Unmarshal(data, msg)
-
-		case RESOURCE_OFFERS_EVENT:
-			msg = new(mesos.ResourceOffersMessage)
-			err = proto.Unmarshal(data, msg)
-
-		case RESCIND_OFFER_EVENT:
-			msg = new(mesos.RescindResourceOfferMessage)
-			err = proto.Unmarshal(data, msg)
-
-		case STATUS_UPDATE_EVENT:
-			msg = new(mesos.StatusUpdateMessage)
-			err = proto.Unmarshal(data, msg)
-
-		case FRAMEWORK_MESSAGE_EVENT:
-			msg = new(mesos.ExecutorToFrameworkMessage)
-			err = proto.Unmarshal(data, msg)
-
-		case LOST_SLAVE_EVENT:
-			msg = new(mesos.LostSlaveMessage)
-			err = proto.Unmarshal(data, msg)
-
-		default:
-			err = fmt.Errorf("Unable to parse event from master: %s unrecognized.", messageType)
-			code = http.StatusBadRequest
-			comment = err.Error()
-		}
-
-		if err != nil {
-			code = http.StatusBadRequest
-			comment = fmt.Sprintf("Error unmashalling %s: %s", messageType, err.Error())
-			proc.eventMsgQ <- NewMesosError(comment)
+			comment = "Request path malformed."
 		} else {
-			proc.eventMsgQ <- msg
+			messageType := messageParts[2]
+
+			data, err := ioutil.ReadAll(req.Body)
+			if err != nil {
+				code = http.StatusBadRequest
+				comment = "Request body missing."
+			}
+			defer req.Body.Close()
+
+			// dispatch msg based on type
+			var msg proto.Message
+			switch messageType {
+			case FRAMEWORK_REGISTERED_EVENT:
+				msg = new(mesos.FrameworkRegisteredMessage)
+				err = proto.Unmarshal(data, msg)
+
+			case FRAMEWORK_REREGISTERED_EVENT:
+				msg = new(mesos.FrameworkReregisteredMessage)
+				err = proto.Unmarshal(data, msg)
+
+			case RESOURCE_OFFERS_EVENT:
+				msg = new(mesos.ResourceOffersMessage)
+				err = proto.Unmarshal(data, msg)
+
+			case RESCIND_OFFER_EVENT:
+				msg = new(mesos.RescindResourceOfferMessage)
+				err = proto.Unmarshal(data, msg)
+
+			case STATUS_UPDATE_EVENT:
+				msg = new(mesos.StatusUpdateMessage)
+				err = proto.Unmarshal(data, msg)
+
+			case FRAMEWORK_MESSAGE_EVENT:
+				msg = new(mesos.ExecutorToFrameworkMessage)
+				err = proto.Unmarshal(data, msg)
+
+			case LOST_SLAVE_EVENT:
+				msg = new(mesos.LostSlaveMessage)
+				err = proto.Unmarshal(data, msg)
+
+			default:
+				err = fmt.Errorf("Unable to parse event from master: %s unrecognized.", messageType)
+				code = http.StatusBadRequest
+				comment = err.Error()
+			}
+
+			if err != nil {
+				code = http.StatusBadRequest
+				comment = fmt.Sprintf("Error unmashalling %s: %s", messageType, err.Error())
+				proc.eventMsgQ <- NewMesosError(comment)
+			} else {
+				proc.eventMsgQ <- msg
+			}
 		}
-	}
 
 	rsp.WriteHeader(code)
 	if comment != "" {
