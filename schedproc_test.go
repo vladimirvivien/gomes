@@ -335,7 +335,7 @@ func TestStatusUpdateMessage(t *testing.T) {
 				t.Fatal("Expected StatusUpdateMessage.FramewId not received.")
 			}
 
-			if val.Update.Status.GetState() != mesos.TaskState(mesos.TaskState_TASK_RUNNING) {
+			if val.Update.`Status.GetState() != mesos.TaskState(mesos.TaskState_TASK_RUNNING) {
 				t.Fatal("Expected StatusUpdateMessage.Update.Status.State not received.")
 			}
 

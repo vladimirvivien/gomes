@@ -64,7 +64,11 @@ func TestDriverStart(t *testing.T) {
 	})
 	defer server.Close()
 	url, _ := url.Parse(server.URL)
-	driver, err := NewSchedDriver(nil, makeMockFrameworkInfo(), url.Host)
+	driver, err := NewSchedDriver(
+		nil,
+		NewFrameworkInfo("test", "test-framework-1", NewFrameworkID("test-id")),
+		url.Host,
+	)
 	if err != nil {
 		t.Fatal("Error creating SchedulerDriver", err)
 	}
@@ -75,7 +79,10 @@ func TestDriverStart(t *testing.T) {
 }
 
 func TestDriverStart_WithNoMasterAvailable(t *testing.T) {
-	driver, err := NewSchedDriver(nil, makeMockFrameworkInfo(), "localhost:50501")
+	driver, err := NewSchedDriver(
+		nil,
+		NewFrameworkInfo("test", "test-framework-1", NewFrameworkID("test-id")),
+		"localhost:50501")
 	if err != nil {
 		t.Fatal("Error creating SchedulerDriver", err)
 	}
@@ -87,7 +94,11 @@ func TestDriverStart_WithNoMasterAvailable(t *testing.T) {
 }
 
 func TestDriverJoin(t *testing.T) {
-	driver, err := NewSchedDriver(nil, makeMockFrameworkInfo(), ":15050")
+	driver, err := NewSchedDriver(
+		nil,
+		NewFrameworkInfo("test", "test-framework-1", NewFrameworkID("test-id")),
+		":15050",
+	)
 	if err != nil {
 		t.Fatal("Error creating SchedulerDriver", err)
 	}
@@ -110,7 +121,9 @@ func TestDriverRun(t *testing.T) {
 	})
 	defer server.Close()
 	url, _ := url.Parse(server.URL)
-	driver, err := NewSchedDriver(nil, makeMockFrameworkInfo(), url.Host)
+	driver, err := NewSchedDriver(
+		nil, NewFrameworkInfo("test", "test-framework-1", NewFrameworkID("test-id")),
+		url.Host)
 	if err != nil {
 		t.Fatal("Error creating SchedulerDriver", err)
 	}
@@ -132,13 +145,17 @@ func TestDriverStop(t *testing.T) {
 	})
 	defer server.Close()
 	url, _ := url.Parse(server.URL)
-	driver, err := NewSchedDriver(nil, makeMockFrameworkInfo(), url.Host)
+	driver, err := NewSchedDriver(
+		nil,
+		NewFrameworkInfo("test", "test-framework-1", NewFrameworkID("test-id")),
+		url.Host)
 	if err != nil {
 		t.Fatal("Error creating SchedulerDriver", err)
 	}
 
 	go func() {
 		stat := driver.Run()
+		log.Println("Stopping driver....")
 		if stat != mesos.Status_DRIVER_STOPPED {
 			t.Fatal("Expected mesos.Status_DRIVER_STOPPED, but got ", stat)
 			<-driver.controlQ // bleed chan
@@ -157,7 +174,9 @@ func TestDriverAbort(t *testing.T) {
 	})
 	defer server.Close()
 	url, _ := url.Parse(server.URL)
-	driver, err := NewSchedDriver(nil, makeMockFrameworkInfo(), url.Host)
+	driver, err := NewSchedDriver(nil,
+		NewFrameworkInfo("test", "test-framework-1", NewFrameworkID("test-id")),
+		url.Host)
 	if err != nil {
 		t.Fatal("Error creating SchedulerDriver", err)
 	}

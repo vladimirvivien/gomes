@@ -13,7 +13,6 @@ import (
 type masterClient struct {
 	address    address
 	httpClient http.Client
-	connected  bool
 }
 
 func newMasterClient(master string) *masterClient {
@@ -31,8 +30,6 @@ func newMasterClient(master string) *masterClient {
 				DisableCompression: true,
 			},
 		},
-
-		connected: true, //TODO fix
 	}
 }
 

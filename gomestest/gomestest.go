@@ -20,7 +20,7 @@ func init() {
 	}
 
 	Sched.ResourceOffers = func(driver *gomes.SchedulerDriver, offers []*mesos.Offer) {
-		log.Println("Got ", len(offers), "from master.")
+		log.Println("Got ", len(offers), "offers from master.")
 		log.Println("Offer 1", offers[0])
 	}
 
@@ -32,6 +32,7 @@ func init() {
 func main() {
 	log.Println("Starting gomestest.")
 	log.Println("Assuming master 127.0.0.1:5050...")
+
 	master := "127.0.0.1:5050"
 
 	framework := &mesos.FrameworkInfo{
@@ -49,6 +50,7 @@ func main() {
 
 	stat := driver.Run()
 	if stat != mesos.Status_DRIVER_STOPPED {
-		log.Println("Framework did not stop properly.")
+		log.Println("A problem occured, framework reported status " + stat)
 	}
+	driver.Stop(false)
 }

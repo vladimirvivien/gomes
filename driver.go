@@ -28,6 +28,8 @@ type SchedulerDriver struct {
 	schedMsgQ    chan interface{}
 	controlQ     chan mesos.Status
 	schedProc    *schedulerProcess
+	connected    bool
+	failover     bool
 }
 
 func NewSchedDriver(scheduler *Scheduler, framework *mesos.FrameworkInfo, master string) (*SchedulerDriver, error) {
@@ -61,8 +63,11 @@ func NewSchedDriver(scheduler *Scheduler, framework *mesos.FrameworkInfo, master
 	driver := &SchedulerDriver{
 		Master:        master,
 		FrameworkInfo: framework,
+		Status:        mesos.Status_DRIVER_NOT_STARTED,
 		schedMsgQ:     make(chan interface{}, 10),
 		controlQ:      make(chan mesos.Status),
+		connected:     false,
+		failover:      false,
 	}
 
 	driver.Scheduler = scheduler
@@ -124,7 +129,7 @@ func (driver *SchedulerDriver) Run() mesos.Status {
 
 func (driver *SchedulerDriver) Stop(failover bool) mesos.Status {
 	log.Printf("Stopping framework [%s]", driver.FrameworkInfo.GetId().GetValue())
-	if driver.Status != mesos.Status_DRIVER_RUNNING && driver.Status != mesos.Status_DRIVER_ABORTED {
+	if driver.Status != mesos.Status_DRIVER_RUNNING {
 		return driver.Status
 	}
 	err := driver.schedProc.stop()
@@ -132,7 +137,7 @@ func (driver *SchedulerDriver) Stop(failover bool) mesos.Status {
 		driver.schedMsgQ <- err
 	}
 
-	if driver.masterClient.connected && !failover {
+	if driver.connected && !failover {
 		err = driver.masterClient.UnregisterFramework(driver.schedProc.processId, driver.FrameworkInfo.Id)
 		if err != nil {
 			driver.Status = mesos.Status_DRIVER_ABORTED
@@ -152,7 +157,7 @@ func (driver *SchedulerDriver) Abort() mesos.Status {
 		return driver.Status
 	}
 
-	if !driver.masterClient.connected {
+	if !driver.connected {
 		log.Println("Not sending deactivate message, master is disconnected.")
 	} else {
 		err := driver.masterClient.DeactivateFramework(driver.schedProc.processId, driver.FrameworkInfo.Id)
@@ -173,24 +178,22 @@ func setupSchedMsgQ(driver *SchedulerDriver) {
 	sched := driver.Scheduler
 	for event := range driver.schedMsgQ {
 		if driver.Scheduler == nil {
-			log.Println("WARN: Scheduler not set.")
+			log.Println("WARN: Scheduler not set, no event will be handled.")
 			break
 		}
 
 		switch msg := event.(type) {
 		case *mesos.FrameworkRegisteredMessage:
-			go func() {
-				if sched.Registered != nil {
-					sched.Registered(driver, msg.FrameworkId, msg.MasterInfo)
-				}
-			}()
+			driver.handleRegistered(msg)
+			if sched.Registered != nil {
+				go sched.Registered(driver, msg.FrameworkId, msg.MasterInfo)
+			}
 
 		case *mesos.FrameworkReregisteredMessage:
-			go func() {
-				if sched.Reregistered != nil {
-					sched.Reregistered(driver, msg.MasterInfo)
-				}
-			}()
+			driver.handleReregistered(msg)
+			if sched.Reregistered != nil {
+				sched.Reregistered(driver, msg.MasterInfo)
+			}
 
 		case *mesos.ResourceOffersMessage:
 			go func() {
@@ -229,18 +232,70 @@ func setupSchedMsgQ(driver *SchedulerDriver) {
 
 		case MesosError:
 			go func() {
-				driver.handleDriverError(msg)
+				driver.handleError(msg)
 			}()
 		default:
 			go func() {
 				err := NewMesosError("Driver received unexpected event.")
-				driver.handleDriverError(err)
+				driver.handleError(err)
 			}()
 		}
 	}
 }
 
-func (driver *SchedulerDriver) handleDriverError(err MesosError) {
+func (driver *SchedulerDriver) handleRegistered(msg *mesos.FrameworkRegisteredMessage) {
+	if driver.Status == mesos.Status_DRIVER_ABORTED {
+		log.Println("Ignoring FrameworkRegisteredMessage, the driver is aborted!")
+		return
+	}
+
+	if driver.connected == true {
+		log.Println("Ignoring FrameworkRegisteredMessage, the driver is already connected!")
+		return
+	}
+
+	//TODO detect if message was from leading-master (sched.cpp)
+
+	log.Printf("Framework registered with ID [%s] ", msg.GetFrameworkId().GetValue())
+
+	// TODO add synchronization
+	driver.connected = true
+	driver.failover = false
+}
+
+func (driver *SchedulerDriver) handleReregistered(msg *mesos.FrameworkReregisteredMessage) {
+	if driver.Status == mesos.Status_DRIVER_ABORTED {
+		log.Println("Ignoring FrameworkReRegisteredMessage, the driver is aborted!")
+		return
+	}
+
+	if driver.connected == true {
+		log.Println("Ignoring FrameworkReRegisteredMessage, the driver is already connected!")
+		return
+	}
+
+	//TODO detect if message was from leading-master (sched.cpp)
+
+	log.Printf("Framework re-registered with ID [%s] ", msg.GetFrameworkId().GetValue())
+
+	// TODO add synchronization
+	driver.connected = true
+	driver.failover = false
+}
+
+func (driver *SchedulerDriver) handleResourceOffers(msg *mesos.ResourceOffersMessage) {
+	if driver.Status == mesos.Status_DRIVER_ABORTED {
+		log.Println("Ignoring ResourceOffersMessage, the driver is aborted!")
+		return
+	}
+
+	if !driver.connected {
+		log.Println("Ignoring ResourceOffersMessage, the driver is not connected!")
+		return
+	}
+}
+
+func (driver *SchedulerDriver) handleError(err MesosError) {
 	if driver.Status == mesos.Status_DRIVER_ABORTED {
 		log.Println("Ignoring error because driver is aborted.")
 		return

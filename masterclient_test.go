@@ -4,9 +4,7 @@ import (
 	"code.google.com/p/goprotobuf/proto"
 	mesos "github.com/vladimirvivien/gomes/mesosproto"
 	"io/ioutil"
-	"log"
 	"net/http"
-	"net/http/httptest"
 	"net/url"
 	"regexp"
 	"testing"
@@ -159,18 +157,4 @@ func TestDeactivateFramework(t *testing.T) {
 	master := newMasterClient(url.Host)
 	frameworkId := &mesos.FrameworkID{Value: proto.String("test-framework-1")}
 	master.DeactivateFramework(newSchedProcID(":7000"), frameworkId)
-}
-
-func makeMockServer(handler func(rsp http.ResponseWriter, req *http.Request)) *httptest.Server {
-	server := httptest.NewServer(http.HandlerFunc(handler))
-	log.Println("Created server  " + server.URL)
-	return server
-}
-
-func makeMockFrameworkInfo() *mesos.FrameworkInfo {
-	return &mesos.FrameworkInfo{
-		User: proto.String("test-user"),
-		Name: proto.String("test-name"),
-		Id:   &mesos.FrameworkID{Value: proto.String("test-framework-1")},
-	}
 }
