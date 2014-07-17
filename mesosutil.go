@@ -48,7 +48,7 @@ func NewTaskID(id string) *mesos.TaskID {
 
 func NewTaskStatus(taskId *mesos.TaskID, state mesos.TaskState) *mesos.TaskStatus {
 	return &mesos.TaskStatus{
-		TaskId: &mesos.TaskID{Value: proto.String("test-task-1")},
+		TaskId: taskId,
 		State:  mesos.TaskState(state).Enum(),
 	}
 }

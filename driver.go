@@ -140,10 +140,11 @@ func (driver *SchedulerDriver) Stop(failover bool) mesos.Status {
 	if driver.connected && !failover {
 		err = driver.masterClient.UnregisterFramework(driver.schedProc.processId, driver.FrameworkInfo.Id)
 		if err != nil {
-			driver.Status = mesos.Status_DRIVER_ABORTED
+			driver.Status = mesos.Status_DRIVER_ABORTED //TODO confirm logic
 			driver.schedMsgQ <- NewMesosError("Failed to unregister the framework:" + err.Error())
 		} else {
 			driver.Status = mesos.Status_DRIVER_STOPPED
+			driver.connected = false // assume disconnection.
 		}
 	}
 

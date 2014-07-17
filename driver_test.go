@@ -145,14 +145,30 @@ func TestDriverRun(t *testing.T) {
 	}
 
 	go func() {
-		stat := driver.Run()
+		stat := driver.Run() // blocked
 		if stat != mesos.Status_DRIVER_ABORTED {
 			t.Fatal("Expected mesos.Status_DRIVER_ABORTED, but got ", stat)
 			<-driver.controlQ // bleed chan
 		}
 	}()
+	time.Sleep(time.Millisecond * 21)
+	if driver.Status == mesos.Status_DRIVER_RUNNING {
+		// simulate registered event
+		msg := &mesos.FrameworkRegisteredMessage{
+			FrameworkId: NewFrameworkID("framework-1"),
+			MasterInfo:  NewMasterInfo("master-1", 12345, 1234),
+		}
+		driver.schedMsgQ <- msg
+		time.Sleep(time.Millisecond * 21)
+	} else {
+		t.Fatal("SchedulerDriver.Run() - failed to start:", driver.Status, ". Expecting DRIVER_RUNNING ")
+	}
 
-	driver.controlQ <- mesos.Status_DRIVER_ABORTED
+	if driver.connected {
+		driver.controlQ <- mesos.Status_DRIVER_ABORTED
+	} else {
+		t.Fatal("SchedulerDriver.Run() did not set connected flag.")
+	}
 }
 
 func TestDriverStop(t *testing.T) {
@@ -177,11 +193,25 @@ func TestDriverStop(t *testing.T) {
 			<-driver.controlQ // bleed chan
 		}
 	}()
-	time.Sleep(101 * time.Millisecond) // stall.
-	if driver.Status != mesos.Status_DRIVER_RUNNING {
+	time.Sleep(time.Millisecond * 21) // stall.
+	if driver.Status == mesos.Status_DRIVER_RUNNING {
+		// simulate registered event
+		msg := &mesos.FrameworkRegisteredMessage{
+			FrameworkId: NewFrameworkID("framework-1"),
+			MasterInfo:  NewMasterInfo("master-1", 12345, 1234),
+		}
+		driver.schedMsgQ <- msg
+		time.Sleep(time.Millisecond * 21)
+	} else {
 		t.Fatal("Expected DRIVER_RUNNING, but got ", driver.Status)
 	}
-	driver.Stop(false)
+	stat := driver.Stop(false)
+	if stat != mesos.Status_DRIVER_STOPPED {
+		t.Fatal("SchedulerDriver.Stop() - Expected DRIVER_STOPPED, but got ", stat)
+	}
+	if driver.connected {
+		t.Fatal("SchedulerDriver.Stop() not setting connected to false.")
+	}
 }
 
 func TestDriverAbort(t *testing.T) {
@@ -202,13 +232,29 @@ func TestDriverAbort(t *testing.T) {
 		if stat != mesos.Status_DRIVER_ABORTED {
 			t.Fatal("Expected mesos.Status_DRIVER_STOPPED, but got ", stat)
 			<-driver.controlQ // bleed chan
+			if stat != mesos.Status_DRIVER_STOPPED {
+				t.Fatal("SchedulerDriver.Stop() - Expected DRIVER_STOPPED, but got ", stat)
+			}
 		}
 	}()
-	time.Sleep(101 * time.Millisecond) // stall.
-	if driver.Status != mesos.Status_DRIVER_RUNNING {
+	time.Sleep(21 * time.Millisecond) // stall.
+	if driver.Status == mesos.Status_DRIVER_RUNNING {
+		// simulate registered event
+		msg := &mesos.FrameworkRegisteredMessage{
+			FrameworkId: NewFrameworkID("framework-1"),
+			MasterInfo:  NewMasterInfo("master-1", 12345, 1234),
+		}
+		driver.schedMsgQ <- msg
+		time.Sleep(time.Millisecond * 21)
+	} else {
 		t.Fatal("Expected DRIVER_RUNNING, but got ", driver.Status)
 	}
-	driver.Abort()
+
+	stat := driver.Abort()
+	if stat != mesos.Status_DRIVER_ABORTED {
+		t.Fatal("SchedulerDriver.Abort() - Expected DRIVER_ABORTED, but got ", stat)
+	}
+
 }
 
 func TestFrameworkRegisteredMessageHandling(t *testing.T) {
@@ -224,7 +270,7 @@ func TestFrameworkRegisteredMessageHandling(t *testing.T) {
 			log.Fatalf("Scheduler.Registered expects masterInfo, but got nil")
 		}
 
-		if masterInfo.GetId() != "localhost:0" ||
+		if masterInfo.GetId() != "master@localhost" ||
 			masterInfo.GetIp() != 123456 ||
 			masterInfo.GetPort() != 12345 {
 			log.Fatalf("Scheduler.Registered expected MasterInfo values are missing.")
@@ -232,12 +278,8 @@ func TestFrameworkRegisteredMessageHandling(t *testing.T) {
 	}
 
 	msg := &mesos.FrameworkRegisteredMessage{
-		FrameworkId: &mesos.FrameworkID{Value: proto.String("test-framework-1")},
-		MasterInfo: &mesos.MasterInfo{
-			Id:   proto.String("localhost:0"),
-			Ip:   proto.Uint32(123456),
-			Port: proto.Uint32(12345),
-		},
+		FrameworkId: NewFrameworkID("test-framework-1"),
+		MasterInfo:  NewMasterInfo("master@localhost", 123456, 12345),
 	}
 	driver, err := NewSchedDriver(sched, &mesos.FrameworkInfo{}, "localhost:0")
 	if err != nil {
@@ -262,7 +304,7 @@ func TestFrameworkReRegisteredMessageHandling(t *testing.T) {
 
 	msg := &mesos.FrameworkReregisteredMessage{
 		FrameworkId: NewFrameworkID("test-framework"),
-		MasterInfo:  NewMasterInfo("master-1", 12345, 123456),
+		MasterInfo:  NewMasterInfo("master-1", 123456, 12345),
 	}
 	driver, err := NewSchedDriver(sched, &mesos.FrameworkInfo{}, "localhost:0")
 	if err != nil {
