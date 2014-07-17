@@ -164,12 +164,8 @@ func TestFrameworkRegisteredMessage(t *testing.T) {
 		t.Fatal("Unable to start Scheduler Process.	")
 	}
 	msg := &mesos.FrameworkRegisteredMessage{
-		FrameworkId: &mesos.FrameworkID{Value: proto.String("test-framework-1")},
-		MasterInfo: &mesos.MasterInfo{
-			Id:   proto.String("master-1"),
-			Ip:   proto.Uint32(123456),
-			Port: proto.Uint32(12345),
-		},
+		FrameworkId: NewFrameworkID("test-framework-1"),
+		MasterInfo:  NewMasterInfo("master-1", 12356, 12345),
 	}
 	data, err := proto.Marshal(msg)
 	if err != nil {
@@ -210,13 +206,9 @@ func TestFrameworkReRegisteredMessage(t *testing.T) {
 	proc.started = true
 	proc.aborted = false
 
-	msg := &mesos.FrameworkReregisteredMessage{
-		FrameworkId: &mesos.FrameworkID{Value: proto.String("test-framework-1")},
-		MasterInfo: &mesos.MasterInfo{
-			Id:   proto.String("master-1"),
-			Ip:   proto.Uint32(123456),
-			Port: proto.Uint32(12345),
-		},
+	msg := &mesos.FrameworkRegisteredMessage{
+		FrameworkId: NewFrameworkID("test-framework-1"),
+		MasterInfo:  NewMasterInfo("master-1", 123456, 12345),
 	}
 	data, err := proto.Marshal(msg)
 	if err != nil {
@@ -257,12 +249,10 @@ func TestResourceOffersMessage(t *testing.T) {
 
 	msg := &mesos.ResourceOffersMessage{
 		Offers: []*mesos.Offer{
-			&mesos.Offer{
-				Id:          &mesos.OfferID{Value: proto.String("offer-1")},
-				FrameworkId: &mesos.FrameworkID{Value: proto.String("test-framework-1")},
-				SlaveId:     &mesos.SlaveID{Value: proto.String("test-slave-1")},
-				Hostname:    proto.String("localhost"),
-			},
+			NewOffer(NewOfferID("offer-1"),
+				NewFrameworkID("test-framework-1"),
+				NewSlaveID("slave-1"),
+				"localhost"),
 		},
 	}
 
@@ -335,7 +325,7 @@ func TestStatusUpdateMessage(t *testing.T) {
 				t.Fatal("Expected StatusUpdateMessage.FramewId not received.")
 			}
 
-			if val.Update.`Status.GetState() != mesos.TaskState(mesos.TaskState_TASK_RUNNING) {
+			if val.Update.Status.GetState() != mesos.TaskState(mesos.TaskState_TASK_RUNNING) {
 				t.Fatal("Expected StatusUpdateMessage.Update.Status.State not received.")
 			}
 
@@ -353,19 +343,16 @@ func TestStatusUpdateMessage(t *testing.T) {
 	proc.started = true
 	proc.aborted = false
 
+	status := NewTaskStatus(NewTaskID("task-1"), mesos.TaskState_TASK_RUNNING)
+	status.Data = []byte("World!")
 	msg := &mesos.StatusUpdateMessage{
-		Update: &mesos.StatusUpdate{
-			FrameworkId: &mesos.FrameworkID{Value: proto.String("test-framework-1")},
-			Status: &mesos.TaskStatus{
-				TaskId:  &mesos.TaskID{Value: proto.String("test-task-1")},
-				State:   mesos.TaskState(mesos.TaskState_TASK_RUNNING).Enum(),
-				Message: proto.String("Hello"),
-				Data:    []byte("World!"),
-			},
-			Timestamp: proto.Float64(1234567.2),
-			Uuid:      []byte("abcd-efg1-2345-6789-abcd-efg1"),
-		},
+		Update: NewStatusUpdate(
+			NewFrameworkID("test-framework-1"),
+			status,
+			123456789.1,
+			[]byte("abcd-efg1-2345-6789-abcd-efg1")),
 	}
+
 	data, err := proto.Marshal(msg)
 	if err != nil {
 		t.Fatalf("Unable to marshal StatusUpdateMessage, %v", err)
