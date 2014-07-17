@@ -177,30 +177,19 @@ func (driver *SchedulerDriver) Abort() mesos.Status {
 func setupSchedMsgQ(driver *SchedulerDriver) {
 	sched := driver.Scheduler
 	for event := range driver.schedMsgQ {
-		if driver.Scheduler == nil {
+		if sched == nil {
 			log.Println("WARN: Scheduler not set, no event will be handled.")
-			break
 		}
 
 		switch msg := event.(type) {
 		case *mesos.FrameworkRegisteredMessage:
 			driver.handleRegistered(msg)
-			if sched.Registered != nil {
-				go sched.Registered(driver, msg.FrameworkId, msg.MasterInfo)
-			}
 
 		case *mesos.FrameworkReregisteredMessage:
 			driver.handleReregistered(msg)
-			if sched.Reregistered != nil {
-				sched.Reregistered(driver, msg.MasterInfo)
-			}
 
 		case *mesos.ResourceOffersMessage:
-			go func() {
-				if sched.ResourceOffers != nil {
-					sched.ResourceOffers(driver, msg.Offers)
-				}
-			}()
+			driver.handleResourceOffers(msg)
 
 		case *mesos.RescindResourceOfferMessage:
 			go func() {
@@ -261,6 +250,11 @@ func (driver *SchedulerDriver) handleRegistered(msg *mesos.FrameworkRegisteredMe
 	// TODO add synchronization
 	driver.connected = true
 	driver.failover = false
+
+	sched := driver.Scheduler
+	if sched != nil && sched.Registered != nil {
+		go sched.Registered(driver, msg.FrameworkId, msg.MasterInfo)
+	}
 }
 
 func (driver *SchedulerDriver) handleReregistered(msg *mesos.FrameworkReregisteredMessage) {
@@ -281,6 +275,11 @@ func (driver *SchedulerDriver) handleReregistered(msg *mesos.FrameworkReregister
 	// TODO add synchronization
 	driver.connected = true
 	driver.failover = false
+
+	sched := driver.Scheduler
+	if sched != nil && sched.Reregistered != nil {
+		sched.Reregistered(driver, msg.MasterInfo)
+	}
 }
 
 func (driver *SchedulerDriver) handleResourceOffers(msg *mesos.ResourceOffersMessage) {
@@ -293,6 +292,12 @@ func (driver *SchedulerDriver) handleResourceOffers(msg *mesos.ResourceOffersMes
 		log.Println("Ignoring ResourceOffersMessage, the driver is not connected!")
 		return
 	}
+
+	sched := driver.Scheduler
+	if sched != nil && sched.ResourceOffers != nil {
+		go sched.ResourceOffers(driver, msg.Offers)
+	}
+
 }
 
 func (driver *SchedulerDriver) handleError(err MesosError) {

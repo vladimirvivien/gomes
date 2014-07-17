@@ -61,3 +61,7 @@ func NewStatusUpdate(frameworkId *mesos.FrameworkID, taskStatus *mesos.TaskStatu
 		Uuid:        uuid,
 	}
 }
+
+func NewExecutorID(id string) *mesos.ExecutorID {
+	return &mesos.ExecutorID{Value: proto.String(id)}
+}

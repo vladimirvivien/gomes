@@ -39,11 +39,11 @@ func TestScheDriverCreation(t *testing.T) {
 
 func TestScheDriverCreation_WithFrameworkInfo_Override(t *testing.T) {
 	driver, err := NewSchedDriver(
-		nil,
-		&mesos.FrameworkInfo{
-			User:     proto.String("test-user"),
-			Hostname: proto.String("test-host"),
-		},
+		nil, NewFrameworkInfo(
+			"test-user",
+			"test-name",
+			NewFrameworkID("test-framework"),
+		),
 		"localhost:5050",
 	)
 	if err != nil {
@@ -52,8 +52,8 @@ func TestScheDriverCreation_WithFrameworkInfo_Override(t *testing.T) {
 	if driver.FrameworkInfo.GetUser() != "test-user" {
 		t.Fatal("SchedulerDriver not setting User")
 	}
-	if driver.FrameworkInfo.GetHostname() != "test-host" {
-		t.Fatal("SchedulerDriver not setting Hostname")
+	if driver.Master != "localhost:5050" {
+		t.Fatal("SchedulerDriver not setting Master")
 	}
 }
 
@@ -73,8 +73,24 @@ func TestDriverStart(t *testing.T) {
 		t.Fatal("Error creating SchedulerDriver", err)
 	}
 	stat := driver.Start()
-	if stat != mesos.Status_DRIVER_RUNNING {
-		t.Fatal("SchedulerDriver.start() - failed to start:", stat, ". Expecting DRIVER_RUNNING ")
+	if stat == mesos.Status_DRIVER_RUNNING {
+		// simulate registered event
+		msg := &mesos.FrameworkRegisteredMessage{
+			FrameworkId: NewFrameworkID("framework-1"),
+			MasterInfo:  NewMasterInfo("master-1", 12345, 1234),
+		}
+		driver.schedMsgQ <- msg
+		time.Sleep(time.Millisecond * 21)
+	} else {
+		t.Fatal("SchedulerDriver.Start() - failed to start:", stat, ". Expecting DRIVER_RUNNING ")
+	}
+
+	if !driver.connected {
+		t.Fatal("SchedulerDriver.Start() not setting connected flag.")
+	}
+
+	if driver.failover {
+		t.Fatal("SchedulerDriver.Start() not setting failover flag.")
 	}
 }
 
@@ -245,12 +261,8 @@ func TestFrameworkReRegisteredMessageHandling(t *testing.T) {
 	}
 
 	msg := &mesos.FrameworkReregisteredMessage{
-		FrameworkId: &mesos.FrameworkID{Value: proto.String("test-framework-1")},
-		MasterInfo: &mesos.MasterInfo{
-			Id:   proto.String("master-1"),
-			Ip:   proto.Uint32(123456),
-			Port: proto.Uint32(12345),
-		},
+		FrameworkId: NewFrameworkID("test-framework"),
+		MasterInfo:  NewMasterInfo("master-1", 12345, 123456),
 	}
 	driver, err := NewSchedDriver(sched, &mesos.FrameworkInfo{}, "localhost:0")
 	if err != nil {
