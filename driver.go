@@ -175,6 +175,23 @@ func (driver *SchedulerDriver) Abort() mesos.Status {
 
 }
 
+func (driver *SchedulerDriver) KillTask(taskId *mesos.TaskID) mesos.Status {
+	if driver.Status != mesos.Status_DRIVER_RUNNING {
+		return driver.Status
+	}
+
+	if !driver.connected {
+		log.Println("Ignoring kill task message, master is disconnected")
+	} else {
+		err := driver.masterClient.KillTask(driver.schedProc.processId, taskId)
+		if err != nil {
+			log.Println("Unable to kill requested task", taskId.GetValue(), ":", err)
+		}
+	}
+
+	return driver.Status
+}
+
 func setupSchedMsgQ(driver *SchedulerDriver) {
 	sched := driver.Scheduler
 	for event := range driver.schedMsgQ {

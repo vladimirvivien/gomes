@@ -254,6 +254,31 @@ func TestDriverAbort(t *testing.T) {
 	if stat != mesos.Status_DRIVER_ABORTED {
 		t.Fatal("SchedulerDriver.Abort() - Expected DRIVER_ABORTED, but got ", stat)
 	}
+}
+
+func TestKillTask(t *testing.T) {
+	server := makeMockServer(func(rsp http.ResponseWriter, req *http.Request) {
+		rsp.WriteHeader(http.StatusAccepted)
+	})
+	defer server.Close()
+	url, _ := url.Parse(server.URL)
+	driver, err := NewSchedDriver(nil,
+		NewFrameworkInfo("test", "test-framework-1", NewFrameworkID("test-id")),
+		url.Host)
+	if err != nil {
+		t.Fatal("Error creating SchedulerDriver", err)
+	}
+
+	go func() {
+		driver.Run()
+	}()
+	time.Sleep(21 * time.Millisecond) // stall.
+	if driver.Status == mesos.Status_DRIVER_RUNNING {
+		driver.connected = true
+	} else {
+		t.Fatal("Expected DRIVER_RUNNING, but got ", driver.Status)
+	}
+	driver.KillTask(NewTaskID("test-task-1"))
 
 }
 

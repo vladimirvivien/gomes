@@ -158,3 +158,33 @@ func TestDeactivateFramework(t *testing.T) {
 	frameworkId := &mesos.FrameworkID{Value: proto.String("test-framework-1")}
 	master.DeactivateFramework(newSchedProcID(":7000"), frameworkId)
 }
+
+func TestKillTaskMessage(t *testing.T) {
+	server := makeMockServer(func(rsp http.ResponseWriter, req *http.Request) {
+		cmdPath := buildReqPath(KILL_TASK_CALL)
+		if req.URL.Path != cmdPath {
+			t.Fatalf("Expected URL path not found.")
+		}
+
+		data, err := ioutil.ReadAll(req.Body)
+		if err != nil {
+			t.Fatalf("Unable to get TaskID data")
+		}
+		defer req.Body.Close()
+
+		msg := new(mesos.KillTaskMessage)
+		err = proto.Unmarshal(data, msg)
+		if err != nil {
+			t.Fatal("Problem unmarshaling KillTaskMessage")
+		}
+
+		if msg.GetTaskId().GetValue() != "test-task-1" {
+			t.Fatal("Got bad TaskID.")
+		}
+	})
+	defer server.Close()
+	url, _ := url.Parse(server.URL)
+	master := newMasterClient(url.Host)
+	taskId := NewTaskID("test-task-1")
+	master.KillTask(newSchedProcID(":7000"), taskId)
+}

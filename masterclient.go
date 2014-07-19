@@ -49,6 +49,11 @@ func (client *masterClient) DeactivateFramework(schedId schedProcID, frameworkId
 	return client.send(schedId, buildReqPath(DEACTIVATE_FRAMEWORK_CALL), msg)
 }
 
+func (client *masterClient) KillTask(schedId schedProcID, taskId *mesos.TaskID) error {
+	msg := &mesos.KillTaskMessage{TaskId: taskId}
+	return client.send(schedId, buildReqPath(KILL_TASK_CALL), msg)
+}
+
 func (client *masterClient) send(from schedProcID, reqPath string, msg proto.Message) error {
 	u, err := client.address.AsHttpURL()
 	if err != nil {
