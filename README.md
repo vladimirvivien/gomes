@@ -1,5 +1,5 @@
 # Gomes
-Gomes is a (100%) native Go framework API for the [Apache Mesos](http://mesos.apache.org/) cluster manager.  Gomes uses the HTTP wire protocol to send message and receive events to and from a running Mesos master.  This project provides an  idiomatic Go API that makes it super easy to create Mesos frameworks using Go. 
+Gomes is a (100%) pure Go framework API for the [Apache Mesos](http://mesos.apache.org/) cluster manager.  Gomes uses the HTTP wire protocol to send message and receive events to and from a running Mesos master.  This project provides an  idiomatic Go API that makes it super easy to create Mesos frameworks using Go. 
 
 #### Gomes Example
 See a simple Gomes test - https://github.com/vladimirvivien/gomes/blob/master/gomestest/gomestest.go
