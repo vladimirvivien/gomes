@@ -5,6 +5,35 @@ import (
 	mesos "github.com/vladimirvivien/gomes/mesosproto"
 )
 
+func NewValueRange(begin, end uint64) *mesos.Value_Range {
+	return &mesos.Value_Range{Begin: proto.Uint64(begin), End: proto.Uint64(end)}
+}
+
+func NewScalarResource(name string, val float64) *mesos.Resource {
+	return &mesos.Resource{
+		Name:   proto.String(name),
+		Type:   mesos.Value_SCALAR.Enum(),
+		Scalar: &mesos.Value_Scalar{Value: proto.Float64(val)},
+	}
+}
+
+func NewRangesResource(name string, ranges []*mesos.Value_Range) *mesos.Resource {
+	return &mesos.Resource{
+		Name:   proto.String(name),
+		Type:   mesos.Value_RANGES.Enum(),
+		Ranges: &mesos.Value_Ranges{Range: ranges},
+	}
+}
+
+func NewSetResource(name string, items []string) *mesos.Resource {
+	return &mesos.Resource{
+		Name: proto.String(name),
+		Type: mesos.Value_SET.Enum(),
+		Set:  &mesos.Value_Set{Item: items},
+	}
+
+}
+
 func NewFrameworkID(id string) *mesos.FrameworkID {
 	return &mesos.FrameworkID{Value: proto.String(id)}
 }
@@ -44,6 +73,15 @@ func NewSlaveID(id string) *mesos.SlaveID {
 
 func NewTaskID(id string) *mesos.TaskID {
 	return &mesos.TaskID{Value: proto.String(id)}
+}
+
+func NewTaskInfo(
+	name string,
+	taskId *mesos.TaskID,
+	slaveId *mesos.SlaveID,
+	resources []*mesos.Resource,
+) *mesos.TaskInfo {
+	return nil
 }
 
 func NewTaskStatus(taskId *mesos.TaskID, state mesos.TaskState) *mesos.TaskStatus {

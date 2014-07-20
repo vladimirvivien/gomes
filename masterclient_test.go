@@ -188,3 +188,31 @@ func TestKillTaskMessage(t *testing.T) {
 	taskId := NewTaskID("test-task-1")
 	master.KillTask(newSchedProcID(":7000"), taskId)
 }
+
+func TestLaunchTasksMessage(t *testing.T) {
+	server := makeMockServer(func(rsp http.ResponseWriter, req *http.Request) {
+		cmdPath := buildReqPath(LAUNCH_TASKS_CALL)
+		if req.URL.Path != cmdPath {
+			t.Fatalf("Expected URL path not found.")
+		}
+
+		data, err := ioutil.ReadAll(req.Body)
+		if err != nil {
+			t.Fatalf("Unable to get LaunchTasks data")
+		}
+		defer req.Body.Close()
+
+		msg := new(mesos.LaunchTasksMessage)
+		err = proto.Unmarshal(data, msg)
+		if err != nil {
+			t.Fatal("Problem unmarshaling KillTaskMessage")
+		}
+	})
+	defer server.Close()
+	// url, _ := url.Parse(server.URL)
+	// master := newMasterClient(url.Host)
+	// frameworkId := NewFrameworkID("test-framework-1")
+	// offerIds := []*mesos.OfferID{NewOfferID("test-offer-0")}
+	// taskId := NewTaskID("test-task-1")
+	// master.KillTask(newSchedProcID(":7000"), taskId)
+}

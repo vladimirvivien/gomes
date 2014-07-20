@@ -16,6 +16,7 @@ const (
 	UNREGISTER_FRAMEWORK_CALL = "UnregisterFrameworkMessage"
 	DEACTIVATE_FRAMEWORK_CALL = "DeactivateFrameworkMessage"
 	KILL_TASK_CALL            = "KillTaskMessage"
+	LAUNCH_TASKS_CALL         = "LaunchTasksMessage"
 )
 
 // Events from Mesos Master

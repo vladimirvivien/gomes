@@ -34,7 +34,6 @@ func newMasterClient(master string) *masterClient {
 }
 
 func (client *masterClient) RegisterFramework(schedId schedProcID, framework *mesos.FrameworkInfo) error {
-	// prepare registration data
 	regMsg := &mesos.RegisterFrameworkMessage{Framework: framework}
 	return client.send(schedId, buildReqPath(REGISTER_FRAMEWORK_CALL), regMsg)
 }
@@ -52,6 +51,22 @@ func (client *masterClient) DeactivateFramework(schedId schedProcID, frameworkId
 func (client *masterClient) KillTask(schedId schedProcID, taskId *mesos.TaskID) error {
 	msg := &mesos.KillTaskMessage{TaskId: taskId}
 	return client.send(schedId, buildReqPath(KILL_TASK_CALL), msg)
+}
+
+func (client *masterClient) LaunchTasks(
+	schedId schedProcID,
+	frameworkId *mesos.FrameworkID,
+	offerIds []*mesos.OfferID,
+	tasks []*mesos.TaskInfo,
+	filters *mesos.Filters,
+) error {
+	msg := &mesos.LaunchTasksMessage{
+		FrameworkId: frameworkId,
+		OfferIds:    offerIds,
+		Tasks:       tasks,
+		Filters:     filters,
+	}
+	return client.send(schedId, buildReqPath(LAUNCH_TASKS_CALL), msg)
 }
 
 func (client *masterClient) send(from schedProcID, reqPath string, msg proto.Message) error {
