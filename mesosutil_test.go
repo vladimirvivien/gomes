@@ -155,6 +155,30 @@ func TestNewTaskID(t *testing.T) {
 	}
 }
 
+func TestNewTaskInfo(t *testing.T) {
+	info := NewTaskInfo(
+		"simple-task",
+		NewTaskID("simpe-task-1"),
+		NewSlaveID("slave-1"),
+		[]*mesos.Resource{NewScalarResource("mem", 400)},
+	)
+	if info == nil {
+		t.Fatal("Not creating protobuf object TaskInfo")
+	}
+	if info.GetName() != "simple-task" {
+		t.Fatal("Protobuf object TaskInfo.Name missing.")
+	}
+	if info.GetTaskId() == nil {
+		t.Fatal("Protobuf object TaskInfo.TaskId missing.")
+	}
+	if info.GetSlaveId() == nil {
+		t.Fatal("Protobuf object TaskInfo.SlaveId missing.")
+	}
+	if len(info.GetResources()) != 1 {
+		t.Fatal("Protobuf object TaskInfo.Resources missing.")
+	}
+}
+
 func TestNewTaskStatus(t *testing.T) {
 	status := NewTaskStatus(NewTaskID("task-1"), mesos.TaskState_TASK_RUNNING)
 	if status == nil {

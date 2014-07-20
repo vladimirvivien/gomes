@@ -81,7 +81,12 @@ func NewTaskInfo(
 	slaveId *mesos.SlaveID,
 	resources []*mesos.Resource,
 ) *mesos.TaskInfo {
-	return nil
+	return &mesos.TaskInfo{
+		Name:      proto.String(name),
+		TaskId:    taskId,
+		SlaveId:   slaveId,
+		Resources: resources,
+	}
 }
 
 func NewTaskStatus(taskId *mesos.TaskID, state mesos.TaskState) *mesos.TaskStatus {
