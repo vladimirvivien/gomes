@@ -1,3 +1,7 @@
+# Gomes Moved
+### Moved to http://github.com/mesos/mesos-go
+The pure Mesos Go binding that started in this project has been contributed and ported to http://github.com/mesos/mesos-go.  There will be no futher development in this repository.  
+
 # Gomes
 Gomes is a (100%) pure Go framework API for the [Apache Mesos](http://mesos.apache.org/) cluster manager.  Gomes uses the HTTP wire protocol to send message and receive events to and from a running Mesos master.  This project provides an  idiomatic Go API that makes it super easy to create Mesos frameworks using Go. 
 
