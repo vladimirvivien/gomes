@@ -9,13 +9,11 @@ import (
 	"net/http"
 	"net/url"
 	"path"
-	"strconv"
 	"strings"
-	"sync"
+	"sync/atomic"
 )
 
-var schedIdMutex = new(sync.Mutex)
-var schedIdCounter = 0
+var schedIdCounter uint64 = 0
 
 type schedProcID struct {
 	prefix string
@@ -23,15 +21,13 @@ type schedProcID struct {
 }
 
 func newSchedProcID(addr string) schedProcID {
-	cntStr := strconv.Itoa(schedIdCounter)
-	prefix := MESOS_SCHEDULER_PREFIX + "(" + cntStr + ")"
+	counter := atomic.AddUint64(&schedIdCounter, uint64(1))
+	prefix := fmt.Sprintf("%s(%d)", MESOS_SCHEDULER_PREFIX, counter)
 	value := prefix + "@" + addr
 	id := schedProcID{prefix: prefix, value: value}
-	schedIdMutex.Lock()
-	schedIdCounter = schedIdCounter + 1
-	schedIdMutex.Unlock()
 	return id
 }
+
 func (id *schedProcID) asURL() (*url.URL, error) {
 	return url.Parse("http://" + id.value)
 }
